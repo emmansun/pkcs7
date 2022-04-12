@@ -1,7 +1,7 @@
 # pkcs7
 
 [![GoDoc](https://godoc.org/github.com/emmansun/pkcs7?status.svg)](https://godoc.org/github.com/emmansun/pkcs7)
-[![Build Status](https://github.com/emmansun/pkcs7/workflows/CI/badge.svg?branch=master&event=push)](https://github.com/emmansun/pkcs7/actions/workflows/ci.yml?query=branch%3Amaster+event%3Apush)
+[![ci](https://github.com/emmansun/pkcs7/actions/workflows/ci.yml/badge.svg)](https://github.com/emmansun/pkcs7/actions/workflows/ci.yml)
 
 pkcs7 implements parsing and creating signed and enveloped messages.
 
