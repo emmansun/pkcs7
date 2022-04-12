@@ -5,19 +5,20 @@ import (
 	"crypto"
 	"crypto/dsa"
 	"crypto/rand"
-	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
 	"fmt"
 	"math/big"
 	"time"
+
+	"github.com/emmansun/gmsm/smx509"
 )
 
 // SignedData is an opaque data structure for creating signed data payloads
 type SignedData struct {
 	sd                  signedData
-	certs               []*x509.Certificate
+	certs               []*smx509.Certificate
 	data, messageDigest []byte
 	digestOid           asn1.ObjectIdentifier
 	encryptionOid       asn1.ObjectIdentifier
@@ -110,8 +111,8 @@ func (sd *SignedData) SetEncryptionAlgorithm(d asn1.ObjectIdentifier) {
 }
 
 // AddSigner is a wrapper around AddSignerChain() that adds a signer without any parent.
-func (sd *SignedData) AddSigner(ee *x509.Certificate, pkey crypto.PrivateKey, config SignerInfoConfig) error {
-	var parents []*x509.Certificate
+func (sd *SignedData) AddSigner(ee *smx509.Certificate, pkey crypto.PrivateKey, config SignerInfoConfig) error {
+	var parents []*smx509.Certificate
 	return sd.AddSignerChain(ee, pkey, parents, config)
 }
 
@@ -123,7 +124,7 @@ func (sd *SignedData) AddSigner(ee *x509.Certificate, pkey crypto.PrivateKey, co
 //
 // The signature algorithm used to hash the data is the one of the end-entity
 // certificate.
-func (sd *SignedData) AddSignerChain(ee *x509.Certificate, pkey crypto.PrivateKey, parents []*x509.Certificate, config SignerInfoConfig) error {
+func (sd *SignedData) AddSignerChain(ee *smx509.Certificate, pkey crypto.PrivateKey, parents []*smx509.Certificate, config SignerInfoConfig) error {
 	// Following RFC 2315, 9.2 SignerInfo type, the distinguished name of
 	// the issuer of the end-entity signer is stored in the issuerAndSerialNumber
 	// section of the SignedData.SignerInfo, alongside the serial number of
@@ -203,7 +204,7 @@ func (sd *SignedData) AddSignerChain(ee *x509.Certificate, pkey crypto.PrivateKe
 // This function is needed to sign old Android APKs, something you probably
 // shouldn't do unless you're maintaining backward compatibility for old
 // applications.
-func (sd *SignedData) SignWithoutAttr(ee *x509.Certificate, pkey crypto.PrivateKey, config SignerInfoConfig) error {
+func (sd *SignedData) SignWithoutAttr(ee *smx509.Certificate, pkey crypto.PrivateKey, config SignerInfoConfig) error {
 	var signature []byte
 	sd.sd.DigestAlgorithmIdentifiers = append(sd.sd.DigestAlgorithmIdentifiers, pkix.AlgorithmIdentifier{Algorithm: sd.digestOid})
 	hash, err := getHashForOID(sd.digestOid)
@@ -276,7 +277,7 @@ func (si *signerInfo) SetUnauthenticatedAttributes(extraUnsignedAttrs []Attribut
 }
 
 // AddCertificate adds the certificate to the payload. Useful for parent certificates
-func (sd *SignedData) AddCertificate(cert *x509.Certificate) {
+func (sd *SignedData) AddCertificate(cert *smx509.Certificate) {
 	sd.certs = append(sd.certs, cert)
 }
 
@@ -324,7 +325,7 @@ func (sd *SignedData) RemoveUnauthenticatedAttributes() {
 // then continue down the path. It doesn't require the last parent to be a root CA,
 // or to be trusted in any truststore. It simply verifies that the chain provided, albeit
 // partial, makes sense.
-func verifyPartialChain(cert *x509.Certificate, parents []*x509.Certificate) error {
+func verifyPartialChain(cert *smx509.Certificate, parents []*smx509.Certificate) error {
 	if len(parents) == 0 {
 		return fmt.Errorf("pkcs7: zero parents provided to verify the signature of certificate %q", cert.Subject.CommonName)
 	}
@@ -339,7 +340,7 @@ func verifyPartialChain(cert *x509.Certificate, parents []*x509.Certificate) err
 	return verifyPartialChain(parents[0], parents[1:])
 }
 
-func cert2issuerAndSerial(cert *x509.Certificate) (issuerAndSerial, error) {
+func cert2issuerAndSerial(cert *smx509.Certificate) (issuerAndSerial, error) {
 	var ias issuerAndSerial
 	// The issuer RDNSequence has to match exactly the sequence in the certificate
 	// We cannot use cert.Issuer.ToRDNSequence() here since it mangles the sequence
@@ -382,7 +383,7 @@ type dsaSignature struct {
 }
 
 // concats and wraps the certificates in the RawValue structure
-func marshalCertificates(certs []*x509.Certificate) rawCertificates {
+func marshalCertificates(certs []*smx509.Certificate) rawCertificates {
 	var buf bytes.Buffer
 	for _, cert := range certs {
 		buf.Write(cert.Raw)

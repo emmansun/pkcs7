@@ -15,12 +15,14 @@ import (
 	"sort"
 
 	_ "crypto/sha1" // for crypto.SHA1
+
+	"github.com/emmansun/gmsm/smx509"
 )
 
 // PKCS7 Represents a PKCS7 structure
 type PKCS7 struct {
 	Content      []byte
-	Certificates []*x509.Certificate
+	Certificates []*smx509.Certificate
 	CRLs         []pkix.CertificateList
 	Signers      []signerInfo
 	raw          interface{}
@@ -202,7 +204,7 @@ func parseEncryptedData(data []byte) (*PKCS7, error) {
 	}, nil
 }
 
-func (raw rawCertificates) Parse() ([]*x509.Certificate, error) {
+func (raw rawCertificates) Parse() ([]*smx509.Certificate, error) {
 	if len(raw.Raw) == 0 {
 		return nil, nil
 	}
@@ -212,10 +214,10 @@ func (raw rawCertificates) Parse() ([]*x509.Certificate, error) {
 		return nil, err
 	}
 
-	return x509.ParseCertificates(val.Bytes)
+	return smx509.ParseCertificates(val.Bytes)
 }
 
-func isCertMatchForIssuerAndSerial(cert *x509.Certificate, ias issuerAndSerial) bool {
+func isCertMatchForIssuerAndSerial(cert *smx509.Certificate, ias issuerAndSerial) bool {
 	return cert.SerialNumber.Cmp(ias.SerialNumber) == 0 && bytes.Equal(cert.RawIssuer, ias.IssuerName.FullBytes)
 }
 

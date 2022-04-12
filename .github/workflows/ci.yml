@@ -1,20 +1,39 @@
-name: CI
-on: [push, pull_request]
+name: ci
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
 
 jobs:
-  test:
-    name: Test
+
+  build:
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ['1.12', '1.13', '1.14', '1.15', '1.16']
-    runs-on: ubuntu-latest
+        goVer: ['1.16']    
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout Repo
+      uses: actions/checkout@v2
+  
+    - name: Set up Go
+      uses: actions/setup-go@v2
       with:
-        fetch-depth: 0
-    - uses: actions/setup-go@v2
+        go-version: ${{ matrix.goVer }}
+
+    - name: Setup Environment
+      run: |
+         echo "GOPATH=$(go env GOPATH)" >> $GITHUB_ENV
+         echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+    - name: Module cache
+      uses: actions/cache@v2.1.7
+      env:
+        cache-name: go-mod-cache
       with:
-        go-version: ${{ matrix.go }}
-        stable: false
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-${{ env.cache-name }}-${{ hashFiles('**/go.sum') }}
+          
     - name: Test
-      run: go vet . && go build . && go test -count=1 -covermode=count -coverprofile=coverage.out .
+      run: go test -v ./...

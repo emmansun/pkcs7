@@ -8,10 +8,11 @@ import (
 	"crypto/des"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/x509"
 	"encoding/asn1"
 	"errors"
 	"fmt"
+
+	"github.com/emmansun/gmsm/smx509"
 )
 
 // ErrUnsupportedAlgorithm tells you when our quick dev assumptions have failed
@@ -21,7 +22,7 @@ var ErrUnsupportedAlgorithm = errors.New("pkcs7: cannot decrypt data: only RSA, 
 var ErrNotEncryptedContent = errors.New("pkcs7: content data is a decryptable data type")
 
 // Decrypt decrypts encrypted content info for recipient cert and private key
-func (p7 *PKCS7) Decrypt(cert *x509.Certificate, pkey crypto.PrivateKey) ([]byte, error) {
+func (p7 *PKCS7) Decrypt(cert *smx509.Certificate, pkey crypto.PrivateKey) ([]byte, error) {
 	data, ok := p7.raw.(envelopedData)
 	if !ok {
 		return nil, ErrNotEncryptedContent
@@ -167,7 +168,7 @@ func unpad(data []byte, blocklen int) ([]byte, error) {
 	return data[:len(data)-padlen], nil
 }
 
-func selectRecipientForCertificate(recipients []recipientInfo, cert *x509.Certificate) recipientInfo {
+func selectRecipientForCertificate(recipients []recipientInfo, cert *smx509.Certificate) recipientInfo {
 	for _, recp := range recipients {
 		if isCertMatchForIssuerAndSerial(cert, recp.IssuerAndSerialNumber) {
 			return recp

@@ -7,11 +7,12 @@ import (
 	"crypto/des"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
 	"fmt"
+
+	"github.com/emmansun/gmsm/smx509"
 )
 
 type envelopedData struct {
@@ -259,7 +260,7 @@ func encryptAESCBC(content []byte, key []byte) ([]byte, *encryptedContentInfo, e
 //     ContentEncryptionAlgorithm = EncryptionAlgorithmAES128GCM
 //
 // TODO(fullsailor): Add support for encrypting content with other algorithms
-func Encrypt(content []byte, recipients []*x509.Certificate) ([]byte, error) {
+func Encrypt(content []byte, recipients []*smx509.Certificate) ([]byte, error) {
 	var eci *encryptedContentInfo
 	var key []byte
 	var err error
@@ -379,7 +380,7 @@ func marshalEncryptedContent(content []byte) asn1.RawValue {
 	return asn1.RawValue{Tag: 0, Class: 2, Bytes: asn1Content, IsCompound: true}
 }
 
-func encryptKey(key []byte, recipient *x509.Certificate) ([]byte, error) {
+func encryptKey(key []byte, recipient *smx509.Certificate) ([]byte, error) {
 	if pub := recipient.PublicKey.(*rsa.PublicKey); pub != nil {
 		return rsa.EncryptPKCS1v15(rand.Reader, pub, key)
 	}

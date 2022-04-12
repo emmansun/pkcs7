@@ -1,7 +1,7 @@
 # pkcs7
 
-[![GoDoc](https://godoc.org/go.mozilla.org/pkcs7?status.svg)](https://godoc.org/go.mozilla.org/pkcs7)
-[![Build Status](https://github.com/mozilla-services/pkcs7/workflows/CI/badge.svg?branch=master&event=push)](https://github.com/mozilla-services/pkcs7/actions/workflows/ci.yml?query=branch%3Amaster+event%3Apush)
+[![GoDoc](https://godoc.org/github.com/emmansun/pkcs7?status.svg)](https://godoc.org/github.com/emmansun/pkcs7)
+[![Build Status](https://github.com/emmansun/pkcs7/workflows/CI/badge.svg?branch=master&event=push)](https://github.com/emmansun/pkcs7/actions/workflows/ci.yml?query=branch%3Amaster+event%3Apush)
 
 pkcs7 implements parsing and creating signed and enveloped messages.
 
@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"os"
 
-    "go.mozilla.org/pkcs7"
+    "github.com/emmansun/pkcs7"
 )
 
 func SignAndDetach(content []byte, cert *x509.Certificate, privkey *rsa.PrivateKey) (signed []byte, err error) {
@@ -66,4 +66,4 @@ func SignAndDetach(content []byte, cert *x509.Certificate, privkey *rsa.PrivateK
 
 
 ## Credits
-This is a fork of [fullsailor/pkcs7](https://github.com/fullsailor/pkcs7)
+This is a fork of [mozilla-services/pkcs7](https://github.com/mozilla-services/pkcs7)

@@ -13,6 +13,8 @@ import (
 	"os"
 	"os/exec"
 	"testing"
+
+	"github.com/emmansun/gmsm/smx509"
 )
 
 func TestSign(t *testing.T) {
@@ -31,14 +33,14 @@ func TestSign(t *testing.T) {
 		if err != nil {
 			t.Fatalf("test %s: cannot generate root cert: %s", sigalgroot, err)
 		}
-		truststore := x509.NewCertPool()
+		truststore := smx509.NewCertPool()
 		truststore.AddCert(rootCert.Certificate)
 		for _, sigalginter := range sigalgs {
 			interCert, err := createTestCertificateByIssuer("PKCS7 Test Intermediate Cert", rootCert, sigalginter, true)
 			if err != nil {
 				t.Fatalf("test %s/%s: cannot generate intermediate cert: %s", sigalgroot, sigalginter, err)
 			}
-			var parents []*x509.Certificate
+			var parents []*smx509.Certificate
 			parents = append(parents, interCert.Certificate)
 			for _, sigalgsigner := range sigalgs {
 				signerCert, err := createTestCertificateByIssuer("PKCS7 Test Signer Cert", interCert, sigalgsigner, false)
@@ -103,7 +105,7 @@ func TestDSASignAndVerifyWithOpenSSL(t *testing.T) {
 	if block == nil {
 		t.Fatal("failed to parse certificate PEM")
 	}
-	signerCert, err := x509.ParseCertificate(block.Bytes)
+	signerCert, err := smx509.ParseCertificate(block.Bytes)
 	if err != nil {
 		t.Fatal("failed to parse certificate: " + err.Error())
 	}

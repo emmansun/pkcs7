@@ -12,6 +12,8 @@ import (
 	"os/exec"
 	"testing"
 	"time"
+
+	"github.com/emmansun/gmsm/smx509"
 )
 
 func TestVerify(t *testing.T) {
@@ -245,7 +247,7 @@ func TestVerifyFirefoxAddon(t *testing.T) {
 		t.Errorf("Parse encountered unexpected error: %v", err)
 	}
 	p7.Content = FirefoxAddonContent
-	certPool := x509.NewCertPool()
+	certPool := smx509.NewCertPool()
 	certPool.AppendCertsFromPEM(FirefoxAddonRootCert)
 	// verifies at the signingTime authenticated attr
 	if err := p7.VerifyWithChain(certPool); err != nil {
@@ -471,7 +473,7 @@ but that's not what ships are built for.
 		if err != nil {
 			t.Fatalf("test %s: cannot generate root cert: %s", sigalgroot, err)
 		}
-		truststore := x509.NewCertPool()
+		truststore := smx509.NewCertPool()
 		truststore.AddCert(rootCert.Certificate)
 		for _, sigalginter := range sigalgs {
 			interCert, err := createTestCertificateByIssuer("PKCS7 Test Intermediate Cert", rootCert, sigalginter, true)

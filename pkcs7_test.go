@@ -15,6 +15,8 @@ import (
 	"math/big"
 	"os"
 	"time"
+
+	"github.com/emmansun/gmsm/smx509"
 )
 
 var test1024Key, test2048Key, test3072Key, test4096Key *rsa.PrivateKey
@@ -79,7 +81,7 @@ func fromBase10(base10 string) *big.Int {
 }
 
 type certKeyPair struct {
-	Certificate *x509.Certificate
+	Certificate *smx509.Certificate
 	PrivateKey  *crypto.PrivateKey
 }
 
@@ -100,7 +102,7 @@ func createTestCertificateByIssuer(name string, issuer *certKeyPair, sigAlg x509
 		err        error
 		priv       crypto.PrivateKey
 		derCert    []byte
-		issuerCert *x509.Certificate
+		issuerCert *smx509.Certificate
 		issuerKey  crypto.PrivateKey
 	)
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 32)
@@ -245,7 +247,7 @@ func createTestCertificateByIssuer(name string, issuer *certKeyPair, sigAlg x509
 	}
 	if issuer == nil {
 		// no issuer given,make this a self-signed root cert
-		issuerCert = &template
+		issuerCert = (*smx509.Certificate)(&template)
 		issuerKey = priv
 	}
 
@@ -254,30 +256,30 @@ func createTestCertificateByIssuer(name string, issuer *certKeyPair, sigAlg x509
 	case *rsa.PrivateKey:
 		switch issuerKey.(type) {
 		case *rsa.PrivateKey:
-			derCert, err = x509.CreateCertificate(rand.Reader, &template, issuerCert, priv.(*rsa.PrivateKey).Public(), issuerKey.(*rsa.PrivateKey))
+			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*rsa.PrivateKey).Public(), issuerKey.(*rsa.PrivateKey))
 		case *ecdsa.PrivateKey:
-			derCert, err = x509.CreateCertificate(rand.Reader, &template, issuerCert, priv.(*rsa.PrivateKey).Public(), issuerKey.(*ecdsa.PrivateKey))
+			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*rsa.PrivateKey).Public(), issuerKey.(*ecdsa.PrivateKey))
 		case *dsa.PrivateKey:
-			derCert, err = x509.CreateCertificate(rand.Reader, &template, issuerCert, priv.(*rsa.PrivateKey).Public(), issuerKey.(*dsa.PrivateKey))
+			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*rsa.PrivateKey).Public(), issuerKey.(*dsa.PrivateKey))
 		}
 	case *ecdsa.PrivateKey:
 		switch issuerKey.(type) {
 		case *rsa.PrivateKey:
-			derCert, err = x509.CreateCertificate(rand.Reader, &template, issuerCert, priv.(*ecdsa.PrivateKey).Public(), issuerKey.(*rsa.PrivateKey))
+			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*ecdsa.PrivateKey).Public(), issuerKey.(*rsa.PrivateKey))
 		case *ecdsa.PrivateKey:
-			derCert, err = x509.CreateCertificate(rand.Reader, &template, issuerCert, priv.(*ecdsa.PrivateKey).Public(), issuerKey.(*ecdsa.PrivateKey))
+			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*ecdsa.PrivateKey).Public(), issuerKey.(*ecdsa.PrivateKey))
 		case *dsa.PrivateKey:
-			derCert, err = x509.CreateCertificate(rand.Reader, &template, issuerCert, priv.(*ecdsa.PrivateKey).Public(), issuerKey.(*dsa.PrivateKey))
+			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*ecdsa.PrivateKey).Public(), issuerKey.(*dsa.PrivateKey))
 		}
 	case *dsa.PrivateKey:
 		pub := &priv.(*dsa.PrivateKey).PublicKey
 		switch issuerKey := issuerKey.(type) {
 		case *rsa.PrivateKey:
-			derCert, err = x509.CreateCertificate(rand.Reader, &template, issuerCert, pub, issuerKey)
+			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), pub, issuerKey)
 		case *ecdsa.PrivateKey:
-			derCert, err = x509.CreateCertificate(rand.Reader, &template, issuerCert, priv.(*dsa.PublicKey), issuerKey)
+			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*dsa.PublicKey), issuerKey)
 		case *dsa.PrivateKey:
-			derCert, err = x509.CreateCertificate(rand.Reader, &template, issuerCert, priv.(*dsa.PublicKey), issuerKey)
+			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*dsa.PublicKey), issuerKey)
 		}
 	}
 	if err != nil {
@@ -286,7 +288,7 @@ func createTestCertificateByIssuer(name string, issuer *certKeyPair, sigAlg x509
 	if len(derCert) == 0 {
 		return nil, fmt.Errorf("no certificate created, probably due to wrong keys. types were %T and %T", priv, issuerKey)
 	}
-	cert, err := x509.ParseCertificate(derCert)
+	cert, err := smx509.ParseCertificate(derCert)
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +301,7 @@ func createTestCertificateByIssuer(name string, issuer *certKeyPair, sigAlg x509
 
 type TestFixture struct {
 	Input       []byte
-	Certificate *x509.Certificate
+	Certificate *smx509.Certificate
 	PrivateKey  *rsa.PrivateKey
 }
 
@@ -316,7 +318,7 @@ func UnmarshalTestFixture(testPEMBlock string) TestFixture {
 		case "PKCS7":
 			result.Input = derBlock.Bytes
 		case "CERTIFICATE":
-			result.Certificate, _ = x509.ParseCertificate(derBlock.Bytes)
+			result.Certificate, _ = smx509.ParseCertificate(derBlock.Bytes)
 		case "PRIVATE KEY":
 			result.PrivateKey, _ = x509.ParsePKCS1PrivateKey(derBlock.Bytes)
 		}

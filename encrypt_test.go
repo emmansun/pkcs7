@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"crypto/x509"
 	"testing"
+
+	"github.com/emmansun/gmsm/smx509"
 )
 
 func TestEncrypt(t *testing.T) {
@@ -28,7 +30,7 @@ func TestEncrypt(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			encrypted, err := Encrypt(plaintext, []*x509.Certificate{cert.Certificate})
+			encrypted, err := Encrypt(plaintext, []*smx509.Certificate{cert.Certificate})
 			if err != nil {
 				t.Fatal(err)
 			}

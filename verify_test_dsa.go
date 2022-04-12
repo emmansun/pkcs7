@@ -3,13 +3,14 @@
 package pkcs7
 
 import (
-	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"testing"
+
+	"github.com/emmansun/gmsm/smx509"
 )
 
 func TestVerifyEC2(t *testing.T) {
@@ -18,7 +19,7 @@ func TestVerifyEC2(t *testing.T) {
 	if err != nil {
 		t.Errorf("Parse encountered unexpected error: %v", err)
 	}
-	p7.Certificates = []*x509.Certificate{fixture.Certificate}
+	p7.Certificates = []*smx509.Certificate{fixture.Certificate}
 	if err := p7.Verify(); err != nil {
 		t.Errorf("Verify failed with error: %v", err)
 	}
@@ -158,7 +159,7 @@ qzy/7yePTlhlpj+ahMM=
 
 type DSATestFixture struct {
 	Input       []byte
-	Certificate *x509.Certificate
+	Certificate *smx509.Certificate
 }
 
 func UnmarshalDSATestFixture(testPEMBlock string) DSATestFixture {
@@ -174,7 +175,7 @@ func UnmarshalDSATestFixture(testPEMBlock string) DSATestFixture {
 		case "PKCS7":
 			result.Input = derBlock.Bytes
 		case "CERTIFICATE":
-			result.Certificate, _ = x509.ParseCertificate(derBlock.Bytes)
+			result.Certificate, _ = smx509.ParseCertificate(derBlock.Bytes)
 		}
 	}
 

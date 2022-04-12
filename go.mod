@@ -1,3 +1,5 @@
-module go.mozilla.org/pkcs7
+module github.com/emmansun/pkcs7
 
-go 1.11
+go 1.16
+
+require github.com/emmansun/gmsm v0.11.4
