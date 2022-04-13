@@ -12,6 +12,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/emmansun/gmsm/sm2"
+	"github.com/emmansun/gmsm/sm4"
 	"github.com/emmansun/gmsm/smx509"
 )
 
@@ -31,10 +33,18 @@ func (p7 *PKCS7) Decrypt(cert *smx509.Certificate, pkey crypto.PrivateKey) ([]by
 	if recipient.EncryptedKey == nil {
 		return nil, errors.New("pkcs7: no enveloped recipient for provided certificate")
 	}
+
 	switch pkey := pkey.(type) {
 	case *rsa.PrivateKey:
 		var contentKey []byte
 		contentKey, err := rsa.DecryptPKCS1v15(rand.Reader, pkey, recipient.EncryptedKey)
+		if err != nil {
+			return nil, err
+		}
+		return data.EncryptedContentInfo.decrypt(contentKey)
+	case *sm2.PrivateKey:
+		var contentKey []byte
+		contentKey, err := sm2.Decrypt(pkey, recipient.EncryptedKey)
 		if err != nil {
 			return nil, err
 		}
@@ -59,7 +69,9 @@ func (eci encryptedContentInfo) decrypt(key []byte) ([]byte, error) {
 		!alg.Equal(OIDEncryptionAlgorithmDESEDE3CBC) &&
 		!alg.Equal(OIDEncryptionAlgorithmAES256CBC) &&
 		!alg.Equal(OIDEncryptionAlgorithmAES128CBC) &&
+		!alg.Equal(OIDEncryptionAlgorithmSM4CBC) &&
 		!alg.Equal(OIDEncryptionAlgorithmAES128GCM) &&
+		!alg.Equal(OIDEncryptionAlgorithmSM4GCM) &&
 		!alg.Equal(OIDEncryptionAlgorithmAES256GCM) {
 		fmt.Printf("Unsupported Content Encryption Algorithm: %s\n", alg)
 		return nil, ErrUnsupportedAlgorithm
@@ -98,13 +110,15 @@ func (eci encryptedContentInfo) decrypt(key []byte) ([]byte, error) {
 		fallthrough
 	case alg.Equal(OIDEncryptionAlgorithmAES128GCM), alg.Equal(OIDEncryptionAlgorithmAES128CBC):
 		block, err = aes.NewCipher(key)
+	case alg.Equal(OIDEncryptionAlgorithmSM4GCM), alg.Equal(OIDEncryptionAlgorithmSM4CBC):
+		block, err = sm4.NewCipher(key)
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	if alg.Equal(OIDEncryptionAlgorithmAES128GCM) || alg.Equal(OIDEncryptionAlgorithmAES256GCM) {
+	if alg.Equal(OIDEncryptionAlgorithmSM4GCM) || alg.Equal(OIDEncryptionAlgorithmAES128GCM) || alg.Equal(OIDEncryptionAlgorithmAES256GCM) {
 		params := aesGCMParameters{}
 		paramBytes := eci.ContentEncryptionAlgorithm.Parameters.Bytes
 

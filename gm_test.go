@@ -4,6 +4,7 @@ import (
 	"testing"
 )
 
+// from https://www.gmssl.cn/gmssl/index.jsp, just have certificates in SignedData content
 var certificateChainGMSSL = `-----BEGIN PKCS7-----
 MIID6wYJKoZIhvcNAQcCoIID3DCCA9gCAQExADALBgkqhkiG9w0BBwGgggPAMIIB
 zTCCAXCgAwIBAgIGAXKnMKNyMAwGCCqBHM9VAYN1BQAwSTELMAkGA1UEBhMCQ04x

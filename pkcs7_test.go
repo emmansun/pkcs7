@@ -16,6 +16,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/emmansun/gmsm/sm2"
 	"github.com/emmansun/gmsm/smx509"
 )
 
@@ -219,6 +220,13 @@ func createTestCertificateByIssuer(name string, issuer *certKeyPair, sigAlg x509
 		case *dsa.PrivateKey:
 			template.SignatureAlgorithm = x509.DSAWithSHA256
 		}
+	case smx509.SM2WithSM3:
+		priv, err = sm2.GenerateKey(rand.Reader)
+		if err != nil {
+			return nil, err
+		}
+		template.SignatureAlgorithm = smx509.SM2WithSM3
+
 	case x509.DSAWithSHA1:
 		var dsaPriv dsa.PrivateKey
 		params := &dsaPriv.Parameters
@@ -271,6 +279,8 @@ func createTestCertificateByIssuer(name string, issuer *certKeyPair, sigAlg x509
 		case *dsa.PrivateKey:
 			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*ecdsa.PrivateKey).Public(), issuerKey.(*dsa.PrivateKey))
 		}
+	case *sm2.PrivateKey:
+		derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*sm2.PrivateKey).Public(), issuerKey.(*sm2.PrivateKey))
 	case *dsa.PrivateKey:
 		pub := &priv.(*dsa.PrivateKey).PublicKey
 		switch issuerKey := issuerKey.(type) {
