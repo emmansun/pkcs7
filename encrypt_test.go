@@ -11,6 +11,7 @@ import (
 func TestEncrypt(t *testing.T) {
 	modes := []EncryptionAlgorithm{
 		EncryptionAlgorithmDESCBC,
+		EncryptionAlgorithmDESEDE3CBC,
 		EncryptionAlgorithmSM4CBC,
 		EncryptionAlgorithmSM4GCM,
 		EncryptionAlgorithmAES128CBC,
