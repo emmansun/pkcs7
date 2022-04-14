@@ -278,11 +278,15 @@ func Encrypt(alg EncryptionAlgorithm, content []byte, recipients []*smx509.Certi
 		if err != nil {
 			return nil, err
 		}
+		var keyEncryptionAlgorithm asn1.ObjectIdentifier = OIDEncryptionAlgorithmRSA
+		if recipient.SignatureAlgorithm == smx509.SM2WithSM3 {
+			keyEncryptionAlgorithm = OIDKeyEncryptionAlgorithmSM2
+		}
 		info := recipientInfo{
 			Version:               0,
 			IssuerAndSerialNumber: ias,
 			KeyEncryptionAlgorithm: pkix.AlgorithmIdentifier{
-				Algorithm: OIDEncryptionAlgorithmRSA,
+				Algorithm: keyEncryptionAlgorithm,
 			},
 			EncryptedKey: encrypted,
 		}

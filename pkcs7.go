@@ -96,11 +96,14 @@ var (
 	SMOIDEncryptedData       = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 2, 5}
 
 	// Digest Algorithms
-	OIDDigestAlgorithmSM3    = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 401}
+	OIDDigestAlgorithmSM3 = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 401}
+	// SM2Sign-with-SM3
 	OIDDigestAlgorithmSM2SM3 = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 501}
+	// Signature Algorithms SM2-1
+	OIDDigestEncryptionAlgorithmSM2 = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 301, 1}
 
-	// Signature Algorithms
-	OIDEncryptionAlgorithmSM2 = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 301, 1}
+	// Encryption Algorithms SM2-3
+	OIDKeyEncryptionAlgorithmSM2 = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 301, 3}
 
 	// Encryption Algorithms
 	OIDEncryptionAlgorithmSM4GCM = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 104, 8}
@@ -170,7 +173,7 @@ func getOIDForEncryptionAlgorithm(pkey crypto.PrivateKey, OIDDigestAlg asn1.Obje
 			return OIDDigestAlgorithmECDSASHA512, nil
 		}
 	case *sm2.PrivateKey:
-		return OIDEncryptionAlgorithmSM2, nil
+		return OIDDigestEncryptionAlgorithmSM2, nil
 	case *dsa.PrivateKey:
 		return OIDDigestAlgorithmDSA, nil
 	}
