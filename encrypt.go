@@ -248,6 +248,20 @@ func encryptCBC(alg EncryptionAlgorithm, content []byte, key []byte) ([]byte, *e
 //
 // TODO(fullsailor): Add support for encrypting content with other algorithms
 func Encrypt(alg EncryptionAlgorithm, content []byte, recipients []*smx509.Certificate) ([]byte, error) {
+	return encrypt(alg, content, recipients, false)
+}
+
+// EncryptSM creates and returns an envelope data PKCS7 structure with encrypted
+// recipient keys for each recipient public key.
+// The OIDs use GM/T 0010 - 2012 set
+//
+// The algorithm used to perform encryption is determined by the argument alg
+//
+func EncryptSM(alg EncryptionAlgorithm, content []byte, recipients []*smx509.Certificate) ([]byte, error) {
+	return encrypt(alg, content, recipients, true)
+}
+
+func encrypt(alg EncryptionAlgorithm, content []byte, recipients []*smx509.Certificate, isSM bool) ([]byte, error) {
 	var eci *encryptedContentInfo
 	var key []byte
 	var err error
@@ -299,6 +313,11 @@ func Encrypt(alg EncryptionAlgorithm, content []byte, recipients []*smx509.Certi
 		Version:              0,
 		RecipientInfos:       recipientInfos,
 	}
+
+	if isSM {
+		envelope.EncryptedContentInfo.ContentType = SMOIDData
+	}
+
 	innerContent, err := asn1.Marshal(envelope)
 	if err != nil {
 		return nil, err
@@ -308,6 +327,10 @@ func Encrypt(alg EncryptionAlgorithm, content []byte, recipients []*smx509.Certi
 	wrapper := contentInfo{
 		ContentType: OIDEnvelopedData,
 		Content:     asn1.RawValue{Class: 2, Tag: 0, IsCompound: true, Bytes: innerContent},
+	}
+
+	if isSM {
+		wrapper.ContentType = SMOIDEnvelopedData
 	}
 
 	return asn1.Marshal(wrapper)
@@ -349,9 +372,13 @@ func EncryptUsingPSK(alg EncryptionAlgorithm, content []byte, key []byte) ([]byt
 		return nil, err
 	}
 
+	var contentType asn1.ObjectIdentifier = OIDEncryptedData
+	if alg == EncryptionAlgorithmSM4GCM {
+		contentType = SMOIDEncryptedData
+	}
 	// Prepare outer payload structure
 	wrapper := contentInfo{
-		ContentType: OIDEncryptedData,
+		ContentType: contentType,
 		Content:     asn1.RawValue{Class: 2, Tag: 0, IsCompound: true, Bytes: innerContent},
 	}
 

@@ -202,11 +202,11 @@ func Parse(data []byte) (p7 *PKCS7, err error) {
 
 	// fmt.Printf("--> Content Type: %s", info.ContentType)
 	switch {
-	case info.ContentType.Equal(OIDSignedData):
+	case info.ContentType.Equal(OIDSignedData) || info.ContentType.Equal(SMOIDSignedData):
 		return parseSignedData(info.Content.Bytes)
-	case info.ContentType.Equal(OIDEnvelopedData):
+	case info.ContentType.Equal(OIDEnvelopedData) || info.ContentType.Equal(SMOIDEnvelopedData):
 		return parseEnvelopedData(info.Content.Bytes)
-	case info.ContentType.Equal(OIDEncryptedData):
+	case info.ContentType.Equal(OIDEncryptedData) || info.ContentType.Equal(SMOIDEncryptedData):
 		return parseEncryptedData(info.Content.Bytes)
 	}
 	return nil, ErrUnsupportedContentType
