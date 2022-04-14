@@ -72,11 +72,11 @@ func verifySignatureAtTime(p7 *PKCS7, signer signerInfo, truststore *smx509.Cert
 		if err != nil {
 			return err
 		}
-		hash, err := getHashForOID(signer.DigestAlgorithm.Algorithm)
+		hasher, err := getHashForOID(signer.DigestAlgorithm.Algorithm)
 		if err != nil {
 			return err
 		}
-		h := hash.New()
+		h := newHash(hasher, signer.DigestAlgorithm.Algorithm)
 		h.Write(p7.Content)
 		computed := h.Sum(nil)
 		if subtle.ConstantTimeCompare(digest, computed) != 1 {
@@ -127,11 +127,11 @@ func verifySignature(p7 *PKCS7, signer signerInfo, truststore *smx509.CertPool) 
 		if err != nil {
 			return err
 		}
-		hash, err := getHashForOID(signer.DigestAlgorithm.Algorithm)
+		hasher, err := getHashForOID(signer.DigestAlgorithm.Algorithm)
 		if err != nil {
 			return err
 		}
-		h := hash.New()
+		h := newHash(hasher, signer.DigestAlgorithm.Algorithm)
 		h.Write(p7.Content)
 		computed := h.Sum(nil)
 		if subtle.ConstantTimeCompare(digest, computed) != 1 {
@@ -319,6 +319,8 @@ func getSignatureAlgorithm(digestEncryption, digest pkix.AlgorithmIdentifier) (x
 			return -1, fmt.Errorf("pkcs7: unsupported digest %q for encryption algorithm %q",
 				digest.Algorithm.String(), digestEncryption.Algorithm.String())
 		}
+	case digestEncryption.Algorithm.Equal(OIDDigestEncryptionAlgorithmSM2):
+		return smx509.SM2WithSM3, nil
 	default:
 		return -1, fmt.Errorf("pkcs7: unsupported algorithm %q",
 			digestEncryption.Algorithm.String())

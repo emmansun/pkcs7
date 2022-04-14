@@ -9,9 +9,12 @@ import (
 	"encoding/asn1"
 	"errors"
 	"fmt"
+	"hash"
 	"math/big"
 	"time"
 
+	"github.com/emmansun/gmsm/sm2"
+	"github.com/emmansun/gmsm/sm3"
 	"github.com/emmansun/gmsm/smx509"
 )
 
@@ -22,6 +25,7 @@ type SignedData struct {
 	data, messageDigest []byte
 	digestOid           asn1.ObjectIdentifier
 	encryptionOid       asn1.ObjectIdentifier
+	isSM                bool
 }
 
 // NewSignedData takes data and initializes a PKCS7 SignedData struct that is
@@ -40,7 +44,20 @@ func NewSignedData(data []byte) (*SignedData, error) {
 		ContentInfo: ci,
 		Version:     1,
 	}
-	return &SignedData{sd: sd, data: data, digestOid: OIDDigestAlgorithmSHA1}, nil
+	return &SignedData{sd: sd, data: data, digestOid: OIDDigestAlgorithmSHA1, isSM: false}, nil
+}
+
+// NewSMSignedData takes data and initializes a PKCS7 SignedData struct that is
+// ready to be signed via AddSigner. The digest algorithm is set to SM3 by default
+// and can be changed by calling SetDigestAlgorithm.
+func NewSMSignedData(data []byte) (*SignedData, error) {
+	sd, err := NewSignedData(data)
+	if err != nil {
+		return nil, err
+	}
+	sd.digestOid = OIDDigestAlgorithmSM3
+	sd.isSM = true
+	return sd, nil
 }
 
 // SignerInfoConfig are optional values to include when adding a signer
@@ -145,11 +162,11 @@ func (sd *SignedData) AddSignerChain(ee *smx509.Certificate, pkey crypto.Private
 	sd.sd.DigestAlgorithmIdentifiers = append(sd.sd.DigestAlgorithmIdentifiers,
 		pkix.AlgorithmIdentifier{Algorithm: sd.digestOid},
 	)
-	hash, err := getHashForOID(sd.digestOid)
+	hasher, err := getHashForOID(sd.digestOid)
 	if err != nil {
 		return err
 	}
-	h := hash.New()
+	h := newHash(hasher, sd.digestOid)
 	h.Write(sd.data)
 	sd.messageDigest = h.Sum(nil)
 	encryptionOid, err := getOIDForEncryptionAlgorithm(pkey, sd.digestOid)
@@ -176,7 +193,7 @@ func (sd *SignedData) AddSignerChain(ee *smx509.Certificate, pkey crypto.Private
 		return err
 	}
 	// create signature of signed attributes
-	signature, err := signAttributes(finalAttrs, pkey, hash)
+	signature, err := signAttributes(finalAttrs, pkey, hasher)
 	if err != nil {
 		return err
 	}
@@ -197,6 +214,16 @@ func (sd *SignedData) AddSignerChain(ee *smx509.Certificate, pkey crypto.Private
 	return nil
 }
 
+func newHash(hasher crypto.Hash, hashOid asn1.ObjectIdentifier) hash.Hash {
+	var h hash.Hash
+	if hashOid.Equal(OIDDigestAlgorithmSM3) || hashOid.Equal(OIDDigestAlgorithmSM2SM3) {
+		h = sm3.New()
+	} else {
+		h = hasher.New()
+	}
+	return h
+}
+
 // SignWithoutAttr issues a signature on the content of the pkcs7 SignedData.
 // Unlike AddSigner/AddSignerChain, it calculates the digest on the data alone
 // and does not include any signed attributes like timestamp and so on.
@@ -207,11 +234,11 @@ func (sd *SignedData) AddSignerChain(ee *smx509.Certificate, pkey crypto.Private
 func (sd *SignedData) SignWithoutAttr(ee *smx509.Certificate, pkey crypto.PrivateKey, config SignerInfoConfig) error {
 	var signature []byte
 	sd.sd.DigestAlgorithmIdentifiers = append(sd.sd.DigestAlgorithmIdentifiers, pkix.AlgorithmIdentifier{Algorithm: sd.digestOid})
-	hash, err := getHashForOID(sd.digestOid)
+	hasher, err := getHashForOID(sd.digestOid)
 	if err != nil {
 		return err
 	}
-	h := hash.New()
+	h := newHash(hasher, sd.digestOid)
 	h.Write(sd.data)
 	sd.messageDigest = h.Sum(nil)
 	switch pkey := pkey.(type) {
@@ -231,7 +258,7 @@ func (sd *SignedData) SignWithoutAttr(ee *smx509.Certificate, pkey crypto.Privat
 		if !ok {
 			return errors.New("pkcs7: private key does not implement crypto.Signer")
 		}
-		signature, err = key.Sign(rand.Reader, sd.messageDigest, hash)
+		signature, err = key.Sign(rand.Reader, sd.messageDigest, nil)
 		if err != nil {
 			return err
 		}
@@ -285,6 +312,9 @@ func (sd *SignedData) AddCertificate(cert *smx509.Certificate) {
 // This must be called right before Finish()
 func (sd *SignedData) Detach() {
 	sd.sd.ContentInfo = contentInfo{ContentType: OIDData}
+	if sd.isSM {
+		sd.sd.ContentInfo.ContentType = SMOIDData
+	}
 }
 
 // GetSignedData returns the private Signed Data
@@ -302,6 +332,9 @@ func (sd *SignedData) Finish() ([]byte, error) {
 	outer := contentInfo{
 		ContentType: OIDSignedData,
 		Content:     asn1.RawValue{Class: 2, Tag: 0, Bytes: inner, IsCompound: true},
+	}
+	if sd.isSM {
+		outer.ContentType = SMOIDSignedData
 	}
 	return asn1.Marshal(outer)
 }
@@ -351,12 +384,17 @@ func cert2issuerAndSerial(cert *smx509.Certificate) (issuerAndSerial, error) {
 }
 
 // signs the DER encoded form of the attributes with the private key
-func signAttributes(attrs []attribute, pkey crypto.PrivateKey, digestAlg crypto.Hash) ([]byte, error) {
+func signAttributes(attrs []attribute, pkey crypto.PrivateKey, hasher crypto.Hash) ([]byte, error) {
 	attrBytes, err := marshalAttributes(attrs)
 	if err != nil {
 		return nil, err
 	}
-	h := digestAlg.New()
+
+	if key, ok := pkey.(sm2.Signer); ok {
+		return key.SignWithSM2(rand.Reader, nil, attrBytes)
+	}
+
+	h := hasher.New()
 	h.Write(attrBytes)
 	hash := h.Sum(nil)
 
@@ -375,7 +413,7 @@ func signAttributes(attrs []attribute, pkey crypto.PrivateKey, digestAlg crypto.
 	if !ok {
 		return nil, errors.New("pkcs7: private key does not implement crypto.Signer")
 	}
-	return key.Sign(rand.Reader, hash, digestAlg)
+	return key.Sign(rand.Reader, hash, hasher)
 }
 
 type dsaSignature struct {

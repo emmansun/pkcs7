@@ -122,6 +122,8 @@ func getHashForOID(oid asn1.ObjectIdentifier) (crypto.Hash, error) {
 		return crypto.SHA384, nil
 	case oid.Equal(OIDDigestAlgorithmSHA512), oid.Equal(OIDDigestAlgorithmECDSASHA512):
 		return crypto.SHA512, nil
+	case oid.Equal(OIDDigestAlgorithmSM3), oid.Equal(OIDDigestAlgorithmSM2SM3):
+		return crypto.Hash(0), nil
 	}
 	return crypto.Hash(0), ErrUnsupportedAlgorithm
 }
@@ -138,6 +140,8 @@ func getDigestOIDForSignatureAlgorithm(digestAlg x509.SignatureAlgorithm) (asn1.
 		return OIDDigestAlgorithmSHA384, nil
 	case x509.SHA512WithRSA, x509.ECDSAWithSHA512:
 		return OIDDigestAlgorithmSHA512, nil
+	case smx509.SM2WithSM3:
+		return OIDDigestAlgorithmSM3, nil
 	}
 	return nil, fmt.Errorf("pkcs7: cannot convert hash to oid, unknown hash algorithm")
 }

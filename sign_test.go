@@ -17,17 +17,7 @@ import (
 	"github.com/emmansun/gmsm/smx509"
 )
 
-func TestSign(t *testing.T) {
-	content := []byte("Hello World")
-	sigalgs := []x509.SignatureAlgorithm{
-		x509.SHA1WithRSA,
-		x509.SHA256WithRSA,
-		x509.SHA512WithRSA,
-		x509.ECDSAWithSHA1,
-		x509.ECDSAWithSHA256,
-		x509.ECDSAWithSHA384,
-		x509.ECDSAWithSHA512,
-	}
+func testSign(t *testing.T, isSM bool, content []byte, sigalgs []x509.SignatureAlgorithm) {
 	for _, sigalgroot := range sigalgs {
 		rootCert, err := createTestCertificateByIssuer("PKCS7 Test Root CA", nil, sigalgroot, true)
 		if err != nil {
@@ -49,7 +39,12 @@ func TestSign(t *testing.T) {
 				}
 				for _, testDetach := range []bool{false, true} {
 					log.Printf("test %s/%s/%s detached %t\n", sigalgroot, sigalginter, sigalgsigner, testDetach)
-					toBeSigned, err := NewSignedData(content)
+					var toBeSigned *SignedData
+					if isSM {
+						toBeSigned, err = NewSMSignedData(content)
+					} else {
+						toBeSigned, err = NewSignedData(content)
+					}
 					if err != nil {
 						t.Fatalf("test %s/%s/%s: cannot initialize signed data: %s", sigalgroot, sigalginter, sigalgsigner, err)
 					}
@@ -90,6 +85,28 @@ func TestSign(t *testing.T) {
 			}
 		}
 	}
+}
+func TestSign(t *testing.T) {
+	content := []byte("Hello World")
+	sigalgs := []x509.SignatureAlgorithm{
+		x509.SHA1WithRSA,
+		x509.SHA256WithRSA,
+		x509.SHA512WithRSA,
+		x509.ECDSAWithSHA1,
+		x509.ECDSAWithSHA256,
+		x509.ECDSAWithSHA384,
+		x509.ECDSAWithSHA512,
+		smx509.SM2WithSM3,
+	}
+	testSign(t, false, content, sigalgs)
+}
+
+func TestSignSM(t *testing.T) {
+	content := []byte("Hello World")
+	sigalgs := []x509.SignatureAlgorithm{
+		smx509.SM2WithSM3,
+	}
+	testSign(t, true, content, sigalgs)
 }
 
 func TestDSASignAndVerifyWithOpenSSL(t *testing.T) {
