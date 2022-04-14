@@ -125,7 +125,7 @@ func getHashForOID(oid asn1.ObjectIdentifier) (crypto.Hash, error) {
 	case oid.Equal(OIDDigestAlgorithmSM3), oid.Equal(OIDDigestAlgorithmSM2SM3):
 		return crypto.Hash(0), nil
 	}
-	return crypto.Hash(0), ErrUnsupportedAlgorithm
+	return crypto.Hash(0), fmt.Errorf("pkcs7: cannot get hash from oid %v", oid)
 }
 
 // getDigestOIDForSignatureAlgorithm takes an x509.SignatureAlgorithm
