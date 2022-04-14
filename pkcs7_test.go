@@ -127,6 +127,7 @@ func createTestCertificateByIssuer(name string, issuer *certKeyPair, sigAlg x509
 		issuerCert = issuer.Certificate
 		issuerKey = *issuer.PrivateKey
 	}
+
 	switch sigAlg {
 	case x509.SHA1WithRSA:
 		priv = test1024Key
@@ -150,6 +151,7 @@ func createTestCertificateByIssuer(name string, issuer *certKeyPair, sigAlg x509
 		}
 	case x509.SHA384WithRSA:
 		priv = test3072Key
+
 		switch issuerKey.(type) {
 		case *rsa.PrivateKey:
 			template.SignatureAlgorithm = x509.SHA384WithRSA
@@ -199,6 +201,7 @@ func createTestCertificateByIssuer(name string, issuer *certKeyPair, sigAlg x509
 		if err != nil {
 			return nil, err
 		}
+
 		switch issuerKey.(type) {
 		case *rsa.PrivateKey:
 			template.SignatureAlgorithm = x509.SHA384WithRSA
@@ -225,7 +228,6 @@ func createTestCertificateByIssuer(name string, issuer *certKeyPair, sigAlg x509
 		if err != nil {
 			return nil, err
 		}
-		template.SignatureAlgorithm = smx509.SM2WithSM3
 
 	case x509.DSAWithSHA1:
 		var dsaPriv dsa.PrivateKey
@@ -238,6 +240,7 @@ func createTestCertificateByIssuer(name string, issuer *certKeyPair, sigAlg x509
 		if err != nil {
 			return nil, err
 		}
+
 		switch issuerKey.(type) {
 		case *rsa.PrivateKey:
 			template.SignatureAlgorithm = x509.SHA1WithRSA
@@ -260,37 +263,15 @@ func createTestCertificateByIssuer(name string, issuer *certKeyPair, sigAlg x509
 	}
 
 	log.Println("creating cert", name, "issued by", issuerCert.Subject.CommonName, "with sigalg", sigAlg)
-	switch priv.(type) {
+	switch pkey := priv.(type) {
 	case *rsa.PrivateKey:
-		switch issuerKey.(type) {
-		case *rsa.PrivateKey:
-			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*rsa.PrivateKey).Public(), issuerKey.(*rsa.PrivateKey))
-		case *ecdsa.PrivateKey:
-			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*rsa.PrivateKey).Public(), issuerKey.(*ecdsa.PrivateKey))
-		case *dsa.PrivateKey:
-			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*rsa.PrivateKey).Public(), issuerKey.(*dsa.PrivateKey))
-		}
+		derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), pkey.Public(), issuerKey)
 	case *ecdsa.PrivateKey:
-		switch issuerKey.(type) {
-		case *rsa.PrivateKey:
-			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*ecdsa.PrivateKey).Public(), issuerKey.(*rsa.PrivateKey))
-		case *ecdsa.PrivateKey:
-			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*ecdsa.PrivateKey).Public(), issuerKey.(*ecdsa.PrivateKey))
-		case *dsa.PrivateKey:
-			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*ecdsa.PrivateKey).Public(), issuerKey.(*dsa.PrivateKey))
-		}
+		derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), pkey.Public(), issuerKey)
 	case *sm2.PrivateKey:
-		derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*sm2.PrivateKey).Public(), issuerKey.(*sm2.PrivateKey))
+		derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), pkey.Public(), issuerKey)
 	case *dsa.PrivateKey:
-		pub := &priv.(*dsa.PrivateKey).PublicKey
-		switch issuerKey := issuerKey.(type) {
-		case *rsa.PrivateKey:
-			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), pub, issuerKey)
-		case *ecdsa.PrivateKey:
-			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*dsa.PublicKey), issuerKey)
-		case *dsa.PrivateKey:
-			derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*dsa.PublicKey), issuerKey)
-		}
+		derCert, err = smx509.CreateCertificate(rand.Reader, &template, (*x509.Certificate)(issuerCert), priv.(*dsa.PublicKey), issuerKey)
 	}
 	if err != nil {
 		return nil, err

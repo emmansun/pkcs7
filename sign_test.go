@@ -50,7 +50,7 @@ func testSign(t *testing.T, isSM bool, content []byte, sigalgs []x509.SignatureA
 					}
 
 					// Set the digest to match the end entity cert
-					signerDigest, _ := getDigestOIDForSignatureAlgorithm(signerCert.Certificate.SignatureAlgorithm)
+					signerDigest, _ := getDigestOIDForSignatureAlgorithm(sigalgsigner)
 					toBeSigned.SetDigestAlgorithm(signerDigest)
 
 					if err := toBeSigned.AddSignerChain(signerCert.Certificate, *signerCert.PrivateKey, parents, SignerInfoConfig{}); err != nil {
