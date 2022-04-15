@@ -121,6 +121,39 @@ func TestEncryptUsingPSK(t *testing.T) {
 	}
 }
 
+func TestEncryptSMUsingPSK(t *testing.T) {
+	modes := []EncryptionAlgorithm{
+		EncryptionAlgorithmDESCBC,
+		EncryptionAlgorithmSM4GCM,
+		EncryptionAlgorithmAES128GCM,
+	}
+
+	for _, mode := range modes {
+		plaintext := []byte("Hello Secret World!")
+		var key []byte
+
+		switch mode {
+		case EncryptionAlgorithmDESCBC:
+			key = []byte("64BitKey")
+		case EncryptionAlgorithmSM4GCM, EncryptionAlgorithmAES128GCM:
+			key = []byte("128BitKey4AESGCM")
+		}
+		ciphertext, err := EncryptSMUsingPSK(mode, plaintext, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		p7, _ := Parse(ciphertext)
+		result, err := p7.DecryptUsingPSK(key)
+		if err != nil {
+			t.Fatalf("cannot Decrypt encrypted result: %s", err)
+		}
+		if !bytes.Equal(plaintext, result) {
+			t.Errorf("encrypted data does not match plaintext:\n\tExpected: %s\n\tActual: %s", plaintext, result)
+		}
+	}
+}
+
 func TestPad(t *testing.T) {
 	tests := []struct {
 		Original  []byte

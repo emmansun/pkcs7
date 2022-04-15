@@ -339,6 +339,17 @@ func encrypt(alg EncryptionAlgorithm, content []byte, recipients []*smx509.Certi
 // EncryptUsingPSK creates and returns an encrypted data PKCS7 structure,
 // encrypted using caller provided pre-shared secret.
 func EncryptUsingPSK(alg EncryptionAlgorithm, content []byte, key []byte) ([]byte, error) {
+	return encryptUsingPSK(false, alg, content, key)
+}
+
+// EncryptSMUsingPSK creates and returns an encrypted data PKCS7 structure,
+// encrypted using caller provided pre-shared secret.
+// This method uses China Standard OID
+func EncryptSMUsingPSK(alg EncryptionAlgorithm, content []byte, key []byte) ([]byte, error) {
+	return encryptUsingPSK(true, alg, content, key)
+}
+
+func encryptUsingPSK(isSM bool, alg EncryptionAlgorithm, content []byte, key []byte) ([]byte, error) {
 	var eci *encryptedContentInfo
 	var err error
 
@@ -373,7 +384,7 @@ func EncryptUsingPSK(alg EncryptionAlgorithm, content []byte, key []byte) ([]byt
 	}
 
 	var contentType asn1.ObjectIdentifier = OIDEncryptedData
-	if alg == EncryptionAlgorithmSM4GCM {
+	if isSM {
 		contentType = SMOIDEncryptedData
 	}
 	// Prepare outer payload structure
