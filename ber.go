@@ -147,7 +147,7 @@ func readObject(ber []byte, offset int) (asn1Object, int, error) {
 	if tag == 0x1F {
 		tag = 0
 		for ber[offset] >= 0x80 {
-			tag = tag*128 + ber[offset] - 0x80
+			tag = tag<<7 + ber[offset] - 0x80
 			offset++
 			if offset > berLen {
 				return nil, 0, errors.New("ber2der: cannot move offset forward, end of ber data reached")
@@ -190,7 +190,7 @@ func readObject(ber []byte, offset int) (asn1Object, int, error) {
 		debugprint("--> (compute length) indicator byte: %x\n", l)
 		debugprint("--> (compute length) length bytes: % X\n", ber[offset:offset+numberOfBytes])
 		for i := 0; i < numberOfBytes; i++ {
-			length = length*256 + (int)(ber[offset])
+			length = length<<8 + (int)(ber[offset])
 			offset++
 			if offset > berLen {
 				return nil, 0, errors.New("ber2der: cannot move offset forward, end of ber data reached")
@@ -259,7 +259,7 @@ func readObject(ber []byte, offset int) (asn1Object, int, error) {
 }
 
 func isIndefiniteTermination(ber []byte, offset int) (bool, error) {
-	if len(ber) - offset < 2 {
+	if len(ber)-offset < 2 {
 		return false, errors.New("ber2der: Invalid BER format")
 	}
 

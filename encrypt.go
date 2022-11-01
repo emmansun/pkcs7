@@ -106,7 +106,7 @@ func encryptGCM(alg EncryptionAlgorithm, content []byte, key []byte) ([]byte, *e
 		algID = OIDEncryptionAlgorithmSM4GCM
 		newBlock = sm4.NewCipher
 	default:
-		return nil, nil, fmt.Errorf("invalid ContentEncryptionAlgorithm in encryptAES/SM4 GCM: %d", alg)
+		return nil, nil, fmt.Errorf("pkcs7: invalid ContentEncryptionAlgorithm in encryptAES/SM4 GCM: %d", alg)
 	}
 	if key == nil {
 		// Create key
@@ -194,7 +194,7 @@ func encryptCBC(alg EncryptionAlgorithm, content []byte, key []byte) ([]byte, *e
 		algID = OIDEncryptionAlgorithmSM4CBC
 		newBlock = sm4.NewCipher
 	default:
-		return nil, nil, fmt.Errorf("invalid ContentEncryptionAlgorithm in encrypt DES/AES/SM4 CBC: %d", alg)
+		return nil, nil, fmt.Errorf("pkcs7: invalid ContentEncryptionAlgorithm in encrypt DES/AES/SM4 CBC: %d", alg)
 	}
 
 	if key == nil {
@@ -295,7 +295,10 @@ func encrypt(alg EncryptionAlgorithm, content []byte, recipients []*smx509.Certi
 		var keyEncryptionAlgorithm asn1.ObjectIdentifier = OIDEncryptionAlgorithmRSA
 		if recipient.SignatureAlgorithm == smx509.SM2WithSM3 {
 			keyEncryptionAlgorithm = OIDKeyEncryptionAlgorithmSM2
+		} else if isSM {
+			return nil, errors.New("pkcs7: Shangmi does not support RSA")
 		}
+
 		info := recipientInfo{
 			Version:               0,
 			IssuerAndSerialNumber: ias,
@@ -315,7 +318,7 @@ func encrypt(alg EncryptionAlgorithm, content []byte, recipients []*smx509.Certi
 	}
 
 	if isSM {
-		envelope.EncryptedContentInfo.ContentType = SMOIDData
+		envelope.EncryptedContentInfo.ContentType = SM2OIDData
 	}
 
 	innerContent, err := asn1.Marshal(envelope)
@@ -330,7 +333,7 @@ func encrypt(alg EncryptionAlgorithm, content []byte, recipients []*smx509.Certi
 	}
 
 	if isSM {
-		wrapper.ContentType = SMOIDEnvelopedData
+		wrapper.ContentType = SM2OIDEnvelopedData
 	}
 
 	return asn1.Marshal(wrapper)
@@ -385,7 +388,7 @@ func encryptUsingPSK(isSM bool, alg EncryptionAlgorithm, content []byte, key []b
 
 	var contentType asn1.ObjectIdentifier = OIDEncryptedData
 	if isSM {
-		contentType = SMOIDEncryptedData
+		contentType = SM2OIDEncryptedData
 	}
 	// Prepare outer payload structure
 	wrapper := contentInfo{

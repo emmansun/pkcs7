@@ -313,7 +313,7 @@ func (sd *SignedData) AddCertificate(cert *smx509.Certificate) {
 func (sd *SignedData) Detach() {
 	sd.sd.ContentInfo = contentInfo{ContentType: OIDData}
 	if sd.isSM {
-		sd.sd.ContentInfo.ContentType = SMOIDData
+		sd.sd.ContentInfo.ContentType = SM2OIDData
 	}
 }
 
@@ -334,7 +334,7 @@ func (sd *SignedData) Finish() ([]byte, error) {
 		Content:     asn1.RawValue{Class: 2, Tag: 0, Bytes: inner, IsCompound: true},
 	}
 	if sd.isSM {
-		outer.ContentType = SMOIDSignedData
+		outer.ContentType = SM2OIDSignedData
 	}
 	return asn1.Marshal(outer)
 }

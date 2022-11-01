@@ -88,12 +88,12 @@ var (
 )
 
 var (
-	//SM Signed Data OIDs
-	SMOIDData                = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 2, 1}
-	SMOIDSignedData          = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 2, 2}
-	SMOIDEnvelopedData       = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 2, 3}
-	SMOIDSignedEnvelopedData = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 2, 4}
-	SMOIDEncryptedData       = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 2, 5}
+	//SM2 Signed Data OIDs
+	SM2OIDData                = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 2, 1}
+	SM2OIDSignedData          = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 2, 2}
+	SM2OIDEnvelopedData       = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 2, 3}
+	SM2OIDSignedEnvelopedData = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 2, 4}
+	SM2OIDEncryptedData       = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 2, 5}
 
 	// Digest Algorithms
 	OIDDigestAlgorithmSM3 = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 401}
@@ -108,6 +108,22 @@ var (
 	// Encryption Algorithms
 	OIDEncryptionAlgorithmSM4GCM = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 104, 8}
 	OIDEncryptionAlgorithmSM4CBC = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 104, 2}
+
+	//SM9 Signed Data OIDs
+	SM9OIDData                = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 4, 1}
+	SM9OIDSignedData          = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 4, 2}
+	SM9OIDEnvelopedData       = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 4, 3}
+	SM9OIDSignedEnvelopedData = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 4, 4}
+	SM9OIDEncryptedData       = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 4, 5}
+
+	// SM9Sign-with-SM3
+	OIDDigestAlgorithmSM9SM3 = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 502}
+
+	// Signature Algorithms SM9-1
+	OIDDigestEncryptionAlgorithmSM9 = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 302, 1}
+
+	// Encryption Algorithms SM9-3
+	OIDKeyEncryptionAlgorithmSM9 = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 302, 3}
 )
 
 func getHashForOID(oid asn1.ObjectIdentifier) (crypto.Hash, error) {
@@ -206,11 +222,11 @@ func Parse(data []byte) (p7 *PKCS7, err error) {
 
 	// fmt.Printf("--> Content Type: %s", info.ContentType)
 	switch {
-	case info.ContentType.Equal(OIDSignedData) || info.ContentType.Equal(SMOIDSignedData):
+	case info.ContentType.Equal(OIDSignedData) || info.ContentType.Equal(SM2OIDSignedData):
 		return parseSignedData(info.Content.Bytes)
-	case info.ContentType.Equal(OIDEnvelopedData) || info.ContentType.Equal(SMOIDEnvelopedData):
+	case info.ContentType.Equal(OIDEnvelopedData) || info.ContentType.Equal(SM2OIDEnvelopedData):
 		return parseEnvelopedData(info.Content.Bytes)
-	case info.ContentType.Equal(OIDEncryptedData) || info.ContentType.Equal(SMOIDEncryptedData):
+	case info.ContentType.Equal(OIDEncryptedData) || info.ContentType.Equal(SM2OIDEncryptedData):
 		return parseEncryptedData(info.Content.Bytes)
 	}
 	return nil, ErrUnsupportedContentType
