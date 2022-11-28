@@ -64,6 +64,7 @@ func NewSMSignedData(data []byte) (*SignedData, error) {
 type SignerInfoConfig struct {
 	ExtraSignedAttributes   []Attribute
 	ExtraUnsignedAttributes []Attribute
+	SkipCertificates        bool
 }
 
 type signedData struct {
@@ -193,7 +194,7 @@ func (sd *SignedData) AddSignerChain(ee *smx509.Certificate, pkey crypto.Private
 		return err
 	}
 	// create signature of signed attributes
-	signature, err := signAttributes(finalAttrs, pkey, hasher)
+	signature, err := signAttributes(finalAttrs, pkey, h, hasher)
 	if err != nil {
 		return err
 	}
@@ -206,9 +207,11 @@ func (sd *SignedData) AddSignerChain(ee *smx509.Certificate, pkey crypto.Private
 		EncryptedDigest:           signature,
 		Version:                   1,
 	}
-	sd.certs = append(sd.certs, ee)
-	if len(parents) > 0 {
-		sd.certs = append(sd.certs, parents...)
+	if !config.SkipCertificates {
+		sd.certs = append(sd.certs, ee)
+		if len(parents) > 0 {
+			sd.certs = append(sd.certs, parents...)
+		}
 	}
 	sd.sd.SignerInfos = append(sd.sd.SignerInfos, signer)
 	return nil
@@ -324,7 +327,7 @@ func (sd *SignedData) GetSignedData() *signedData {
 
 // Finish marshals the content and its signers
 func (sd *SignedData) Finish() ([]byte, error) {
-	sd.sd.Certificates = marshalCertificates(sd.certs)
+	sd.sd.Certificates = MarshalCertificates(sd.certs)
 	inner, err := asn1.Marshal(sd.sd)
 	if err != nil {
 		return nil, err
@@ -384,19 +387,17 @@ func cert2issuerAndSerial(cert *smx509.Certificate) (issuerAndSerial, error) {
 }
 
 // signs the DER encoded form of the attributes with the private key
-func signAttributes(attrs []attribute, pkey crypto.PrivateKey, hasher crypto.Hash) ([]byte, error) {
+func signAttributes(attrs []attribute, pkey crypto.PrivateKey, h hash.Hash, hasher crypto.Hash) ([]byte, error) {
 	attrBytes, err := marshalAttributes(attrs)
 	if err != nil {
 		return nil, err
 	}
 
-	if key, ok := pkey.(sm2.Signer); ok {
-		return key.SignWithSM2(rand.Reader, nil, attrBytes)
+	hash := attrBytes
+	if sm2Opts, ok := pkey.(*sm2.SM2SignerOption); !ok || !sm2Opts.ForceGMSign {
+		h.Write(attrBytes)
+		hash = h.Sum(nil)
 	}
-
-	h := hasher.New()
-	h.Write(attrBytes)
-	hash := h.Sum(nil)
 
 	// dsa doesn't implement crypto.Signer so we make a special case
 	// https://github.com/golang/go/issues/27889
@@ -421,7 +422,7 @@ type dsaSignature struct {
 }
 
 // concats and wraps the certificates in the RawValue structure
-func marshalCertificates(certs []*smx509.Certificate) rawCertificates {
+func MarshalCertificates(certs []*smx509.Certificate) rawCertificates {
 	var buf bytes.Buffer
 	for _, cert := range certs {
 		buf.Write(cert.Raw)
