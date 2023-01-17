@@ -64,7 +64,6 @@ func NewSMSignedData(data []byte) (*SignedData, error) {
 type SignerInfoConfig struct {
 	ExtraSignedAttributes   []Attribute
 	ExtraUnsignedAttributes []Attribute
-	SkipCertificates        bool
 }
 
 type signedData struct {
@@ -207,12 +206,9 @@ func (sd *SignedData) AddSignerChain(ee *smx509.Certificate, pkey crypto.Private
 		EncryptedDigest:           signature,
 		Version:                   1,
 	}
-	
-	if !config.SkipCertificates {
-		sd.certs = append(sd.certs, ee)
-		if len(parents) > 0 {
-			sd.certs = append(sd.certs, parents...)
-		}
+	sd.certs = append(sd.certs, ee)
+	if len(parents) > 0 {
+		sd.certs = append(sd.certs, parents...)
 	}
 	sd.sd.SignerInfos = append(sd.sd.SignerInfos, signer)
 	return nil
