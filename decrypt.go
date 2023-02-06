@@ -7,12 +7,10 @@ import (
 	"crypto/cipher"
 	"crypto/des"
 	"crypto/rand"
-	"crypto/rsa"
 	"encoding/asn1"
 	"errors"
 	"fmt"
 
-	"github.com/emmansun/gmsm/sm2"
 	"github.com/emmansun/gmsm/sm4"
 	"github.com/emmansun/gmsm/smx509"
 )
@@ -35,16 +33,9 @@ func (p7 *PKCS7) Decrypt(cert *smx509.Certificate, pkey crypto.PrivateKey) ([]by
 	}
 
 	switch pkey := pkey.(type) {
-	case *rsa.PrivateKey:
-		var contentKey []byte
-		contentKey, err := rsa.DecryptPKCS1v15(rand.Reader, pkey, recipient.EncryptedKey)
-		if err != nil {
-			return nil, err
-		}
-		return data.EncryptedContentInfo.decrypt(contentKey)
-	case *sm2.PrivateKey:
-		var contentKey []byte
-		contentKey, err := sm2.Decrypt(pkey, recipient.EncryptedKey)
+	case crypto.Decrypter:
+		// Generic case to handle anything that provides the crypto.Decrypter interface.
+		contentKey, err := pkey.Decrypt(rand.Reader, recipient.EncryptedKey, nil)
 		if err != nil {
 			return nil, err
 		}
