@@ -327,7 +327,9 @@ func (sd *SignedData) GetSignedData() *signedData {
 
 // Finish marshals the content and its signers
 func (sd *SignedData) Finish() ([]byte, error) {
-	sd.sd.Certificates = marshalCertificates(sd.certs)
+	if len(sd.certs) > 0 {
+		sd.sd.Certificates = marshalCertificates(sd.certs)
+	}
 	inner, err := asn1.Marshal(sd.sd)
 	if err != nil {
 		return nil, err
