@@ -123,7 +123,7 @@ func (eci encryptedContentInfo) decrypt(key []byte) ([]byte, error) {
 	var iv []byte
 	if alg.Equal(OIDEncryptionAlgorithmSM4GCM) || alg.Equal(OIDEncryptionAlgorithmAES128GCM) || alg.Equal(OIDEncryptionAlgorithmAES256GCM) {
 		params := aesGCMParameters{}
-		paramBytes := eci.ContentEncryptionAlgorithm.Parameters.Bytes
+		paramBytes := eci.ContentEncryptionAlgorithm.Parameters.FullBytes
 
 		_, err := asn1.Unmarshal(paramBytes, &params)
 		if err != nil {

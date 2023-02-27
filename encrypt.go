@@ -175,9 +175,7 @@ func encryptGCM(alg EncryptionAlgorithm, content []byte, key []byte) ([]byte, *e
 		ContentEncryptionAlgorithm: pkix.AlgorithmIdentifier{
 			Algorithm: algID,
 			Parameters: asn1.RawValue{
-				Tag:   asn1.TagSequence,
-				Bytes: paramBytes,
-				IsCompound: true,
+				FullBytes: paramBytes,
 			},
 		},
 		EncryptedContent: marshalEncryptedContent(ciphertext),
