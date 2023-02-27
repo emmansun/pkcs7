@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 
+	smcipher "github.com/emmansun/gmsm/cipher"
 	"github.com/emmansun/gmsm/sm2"
 	"github.com/emmansun/gmsm/sm4"
 	"github.com/emmansun/gmsm/smx509"
@@ -40,6 +41,19 @@ type encryptedContentInfo struct {
 	ContentType                asn1.ObjectIdentifier
 	ContentEncryptionAlgorithm pkix.AlgorithmIdentifier
 	EncryptedContent           asn1.RawValue `asn1:"tag:0,optional"`
+}
+
+func (data envelopedData) GetRecipient(cert *smx509.Certificate) *recipientInfo {
+	for _, recp := range data.RecipientInfos {
+		if isCertMatchForIssuerAndSerial(cert, recp.IssuerAndSerialNumber) {
+			return &recp
+		}
+	}
+	return nil
+}
+
+func (data envelopedData) GetEncryptedContentInfo() *encryptedContentInfo {
+	return &data.EncryptedContentInfo
 }
 
 type EncryptionAlgorithm int
@@ -71,6 +85,12 @@ const (
 
 	// EncryptionAlgorithmSM4GCM is the SM4 128 bits with GCM encryption algorithm
 	EncryptionAlgorithmSM4GCM
+
+	// EncryptionAlgorithmSM4ECB is the SM4 128 bits with ECB encryption algorithm
+	EncryptionAlgorithmSM4ECB
+
+	// EncryptionAlgorithmSM4 is same as EncryptionAlgorithmSM4ECB
+	EncryptionAlgorithmSM4
 )
 
 // ErrUnsupportedEncryptionAlgorithm is returned when attempting to encrypt
@@ -157,6 +177,7 @@ func encryptGCM(alg EncryptionAlgorithm, content []byte, key []byte) ([]byte, *e
 			Parameters: asn1.RawValue{
 				Tag:   asn1.TagSequence,
 				Bytes: paramBytes,
+				IsCompound: true,
 			},
 		},
 		EncryptedContent: marshalEncryptedContent(ciphertext),
@@ -241,6 +262,55 @@ func encryptCBC(alg EncryptionAlgorithm, content []byte, key []byte) ([]byte, *e
 	return key, &eci, nil
 }
 
+func encryptECB(alg EncryptionAlgorithm, content []byte, key []byte) ([]byte, *encryptedContentInfo, error) {
+	var keyLen int
+	var algID asn1.ObjectIdentifier
+	var newBlock func(key []byte) (cipher.Block, error)
+	switch alg {
+	case EncryptionAlgorithmSM4ECB:
+		keyLen = 16
+		algID = OIDEncryptionAlgorithmSM4ECB
+		newBlock = sm4.NewCipher
+	case EncryptionAlgorithmSM4:
+		keyLen = 16
+		algID = OIDEncryptionAlgorithmSM4
+		newBlock = sm4.NewCipher
+	default:
+		return nil, nil, fmt.Errorf("pkcs7: invalid ContentEncryptionAlgorithm in encrypt SM4 ECB: %d", alg)
+	}
+
+	if key == nil {
+		// Create AES key
+		key = make([]byte, keyLen)
+
+		_, err := rand.Read(key)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	// Encrypt padded content
+	block, err := newBlock(key)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	mode := smcipher.NewECBEncrypter(block)
+	cyphertext := make([]byte, len(content))
+	mode.CryptBlocks(cyphertext, content)
+
+	// Prepare ASN.1 Encrypted Content Info
+	eci := encryptedContentInfo{
+		ContentType: OIDData,
+		ContentEncryptionAlgorithm: pkix.AlgorithmIdentifier{
+			Algorithm: algID,
+		},
+		EncryptedContent: marshalEncryptedContent(cyphertext),
+	}
+
+	return key, &eci, nil
+}
+
 // Encrypt creates and returns an envelope data PKCS7 structure with encrypted
 // recipient keys for each recipient public key.
 //
@@ -272,13 +342,18 @@ func encrypt(alg EncryptionAlgorithm, content []byte, recipients []*smx509.Certi
 		key, eci, err = encryptCBC(alg, content, nil)
 	case EncryptionAlgorithmSM4GCM, EncryptionAlgorithmAES128GCM, EncryptionAlgorithmAES256GCM:
 		key, eci, err = encryptGCM(alg, content, nil)
-
+	case EncryptionAlgorithmSM4, EncryptionAlgorithmSM4ECB:
+		key, eci, err = encryptECB(alg, content, nil)
 	default:
 		return nil, ErrUnsupportedEncryptionAlgorithm
 	}
 
 	if err != nil {
 		return nil, err
+	}
+
+	if isSM {
+		eci.ContentType = SM2OIDData
 	}
 
 	// Prepare each recipient's encrypted cipher key

@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 
+	smcipher "github.com/emmansun/gmsm/cipher"
 	"github.com/emmansun/gmsm/sm4"
 	"github.com/emmansun/gmsm/smx509"
 )
@@ -19,16 +20,21 @@ import (
 var ErrUnsupportedAlgorithm = errors.New("pkcs7: cannot decrypt data: only RSA, SM2, DES, DES-EDE3, AES and SM4 supported")
 
 // ErrNotEncryptedContent is returned when attempting to Decrypt data that is not encrypted data
-var ErrNotEncryptedContent = errors.New("pkcs7: content data is a decryptable data type")
+var ErrNotEncryptedContent = errors.New("pkcs7: content data is NOT a decryptable data type")
+
+type decryptable interface {
+	GetRecipient(cert *smx509.Certificate) *recipientInfo
+	GetEncryptedContentInfo() *encryptedContentInfo
+}
 
 // Decrypt decrypts encrypted content info for recipient cert and private key
 func (p7 *PKCS7) Decrypt(cert *smx509.Certificate, pkey crypto.PrivateKey) ([]byte, error) {
-	data, ok := p7.raw.(envelopedData)
+	decryptableData, ok := p7.raw.(decryptable)
 	if !ok {
 		return nil, ErrNotEncryptedContent
 	}
-	recipient := selectRecipientForCertificate(data.RecipientInfos, cert)
-	if recipient.EncryptedKey == nil {
+	recipient := decryptableData.GetRecipient(cert)
+	if recipient == nil {
 		return nil, errors.New("pkcs7: no enveloped recipient for provided certificate")
 	}
 
@@ -39,7 +45,7 @@ func (p7 *PKCS7) Decrypt(cert *smx509.Certificate, pkey crypto.PrivateKey) ([]by
 		if err != nil {
 			return nil, err
 		}
-		return data.EncryptedContentInfo.decrypt(contentKey)
+		return decryptableData.GetEncryptedContentInfo().decrypt(contentKey)
 	}
 	return nil, ErrUnsupportedAlgorithm
 }
@@ -54,22 +60,9 @@ func (p7 *PKCS7) DecryptUsingPSK(key []byte) ([]byte, error) {
 	return data.EncryptedContentInfo.decrypt(key)
 }
 
-func (eci encryptedContentInfo) decrypt(key []byte) ([]byte, error) {
-	alg := eci.ContentEncryptionAlgorithm.Algorithm
-	if !alg.Equal(OIDEncryptionAlgorithmDESCBC) &&
-		!alg.Equal(OIDEncryptionAlgorithmDESEDE3CBC) &&
-		!alg.Equal(OIDEncryptionAlgorithmAES256CBC) &&
-		!alg.Equal(OIDEncryptionAlgorithmAES128CBC) &&
-		!alg.Equal(OIDEncryptionAlgorithmSM4CBC) &&
-		!alg.Equal(OIDEncryptionAlgorithmAES128GCM) &&
-		!alg.Equal(OIDEncryptionAlgorithmSM4GCM) &&
-		!alg.Equal(OIDEncryptionAlgorithmAES256GCM) {
-		return nil, ErrUnsupportedAlgorithm
-	}
-
+func (eci encryptedContentInfo) getCiphertext() (ciphertext []byte) {
 	// EncryptedContent can either be constructed of multple OCTET STRINGs
 	// or _be_ a tagged OCTET STRING
-	var cyphertext []byte
 	if eci.EncryptedContent.IsCompound {
 		// Complex case to concat all of the children OCTET STRINGs
 		var buf bytes.Buffer
@@ -82,11 +75,30 @@ func (eci encryptedContentInfo) decrypt(key []byte) ([]byte, error) {
 				break
 			}
 		}
-		cyphertext = buf.Bytes()
+		ciphertext = buf.Bytes()
 	} else {
 		// Simple case, the bytes _are_ the cyphertext
-		cyphertext = eci.EncryptedContent.Bytes
+		ciphertext = eci.EncryptedContent.Bytes
 	}
+	return
+}
+
+func (eci encryptedContentInfo) decrypt(key []byte) ([]byte, error) {
+	alg := eci.ContentEncryptionAlgorithm.Algorithm
+	if !alg.Equal(OIDEncryptionAlgorithmDESCBC) &&
+		!alg.Equal(OIDEncryptionAlgorithmDESEDE3CBC) &&
+		!alg.Equal(OIDEncryptionAlgorithmAES256CBC) &&
+		!alg.Equal(OIDEncryptionAlgorithmAES128CBC) &&
+		!alg.Equal(OIDEncryptionAlgorithmSM4) &&
+		!alg.Equal(OIDEncryptionAlgorithmSM4ECB) &&
+		!alg.Equal(OIDEncryptionAlgorithmSM4CBC) &&
+		!alg.Equal(OIDEncryptionAlgorithmAES128GCM) &&
+		!alg.Equal(OIDEncryptionAlgorithmSM4GCM) &&
+		!alg.Equal(OIDEncryptionAlgorithmAES256GCM) {
+		return nil, ErrUnsupportedAlgorithm
+	}
+
+	ciphertext := eci.getCiphertext()
 
 	var block cipher.Block
 	var err error
@@ -96,18 +108,19 @@ func (eci encryptedContentInfo) decrypt(key []byte) ([]byte, error) {
 		block, err = des.NewCipher(key)
 	case alg.Equal(OIDEncryptionAlgorithmDESEDE3CBC):
 		block, err = des.NewTripleDESCipher(key)
+	case alg.Equal(OIDEncryptionAlgorithmSM4GCM), alg.Equal(OIDEncryptionAlgorithmSM4CBC), alg.Equal(OIDEncryptionAlgorithmSM4), alg.Equal(OIDEncryptionAlgorithmSM4ECB):
+		block, err = sm4.NewCipher(key)
 	case alg.Equal(OIDEncryptionAlgorithmAES256CBC), alg.Equal(OIDEncryptionAlgorithmAES256GCM):
 		fallthrough
 	case alg.Equal(OIDEncryptionAlgorithmAES128GCM), alg.Equal(OIDEncryptionAlgorithmAES128CBC):
 		block, err = aes.NewCipher(key)
-	case alg.Equal(OIDEncryptionAlgorithmSM4GCM), alg.Equal(OIDEncryptionAlgorithmSM4CBC):
-		block, err = sm4.NewCipher(key)
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
+	var iv []byte
 	if alg.Equal(OIDEncryptionAlgorithmSM4GCM) || alg.Equal(OIDEncryptionAlgorithmAES128GCM) || alg.Equal(OIDEncryptionAlgorithmAES256GCM) {
 		params := aesGCMParameters{}
 		paramBytes := eci.ContentEncryptionAlgorithm.Parameters.Bytes
@@ -129,21 +142,26 @@ func (eci encryptedContentInfo) decrypt(key []byte) ([]byte, error) {
 			return nil, errors.New("pkcs7: encryption algorithm parameters are incorrect")
 		}
 
-		plaintext, err := gcm.Open(nil, params.Nonce, cyphertext, nil)
+		plaintext, err := gcm.Open(nil, params.Nonce, ciphertext, nil)
 		if err != nil {
 			return nil, err
 		}
 
 		return plaintext, nil
+	} else if alg.Equal(OIDEncryptionAlgorithmSM4ECB) || alg.Equal(OIDEncryptionAlgorithmSM4) {
+		mode := smcipher.NewECBDecrypter(block)
+		plaintext := make([]byte, len(ciphertext))
+		mode.CryptBlocks(plaintext, ciphertext)
+		return plaintext, nil
 	}
-
-	iv := eci.ContentEncryptionAlgorithm.Parameters.Bytes
+	iv = eci.ContentEncryptionAlgorithm.Parameters.Bytes
 	if len(iv) != block.BlockSize() {
 		return nil, errors.New("pkcs7: encryption algorithm parameters are malformed")
 	}
+
 	mode := cipher.NewCBCDecrypter(block, iv)
-	plaintext := make([]byte, len(cyphertext))
-	mode.CryptBlocks(plaintext, cyphertext)
+	plaintext := make([]byte, len(ciphertext))
+	mode.CryptBlocks(plaintext, ciphertext)
 	if plaintext, err = unpad(plaintext, mode.BlockSize()); err != nil {
 		return nil, err
 	}
@@ -170,13 +188,4 @@ func unpad(data []byte, blocklen int) ([]byte, error) {
 	}
 
 	return data[:len(data)-padlen], nil
-}
-
-func selectRecipientForCertificate(recipients []recipientInfo, cert *smx509.Certificate) recipientInfo {
-	for _, recp := range recipients {
-		if isCertMatchForIssuerAndSerial(cert, recp.IssuerAndSerialNumber) {
-			return recp
-		}
-	}
-	return recipientInfo{}
 }

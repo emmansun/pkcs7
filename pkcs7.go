@@ -108,6 +108,8 @@ var (
 	// Encryption Algorithms
 	OIDEncryptionAlgorithmSM4GCM = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 104, 8}
 	OIDEncryptionAlgorithmSM4CBC = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 104, 2}
+	OIDEncryptionAlgorithmSM4ECB = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 104, 1}
+	OIDEncryptionAlgorithmSM4    = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 104}
 
 	//SM9 Signed Data OIDs
 	SM9OIDData                = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 4, 1}
@@ -233,8 +235,11 @@ func Parse(data []byte) (p7 *PKCS7, err error) {
 		return parseEnvelopedData(info.Content.Bytes)
 	case info.ContentType.Equal(OIDEncryptedData) || info.ContentType.Equal(SM2OIDEncryptedData):
 		return parseEncryptedData(info.Content.Bytes)
+	case info.ContentType.Equal(OIDSignedEnvelopedData) || info.ContentType.Equal(SM2OIDSignedEnvelopedData):
+		return parseSignedEnvelopedData(info.Content.Bytes)
+	default:
+		return nil, ErrUnsupportedContentType
 	}
-	return nil, ErrUnsupportedContentType
 }
 
 func parseEnvelopedData(data []byte) (*PKCS7, error) {

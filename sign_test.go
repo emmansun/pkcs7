@@ -238,6 +238,10 @@ func TestUnmarshalSignedAttribute(t *testing.T) {
 	if testValue != actual {
 		t.Errorf("Attribute does not match test value\n\tExpected: %s\n\tActual: %s", testValue, actual)
 	}
+	err = p7.Verify()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestSkipCertificates(t *testing.T) {

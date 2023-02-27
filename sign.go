@@ -55,6 +55,7 @@ func NewSMSignedData(data []byte) (*SignedData, error) {
 	if err != nil {
 		return nil, err
 	}
+	sd.sd.ContentInfo.ContentType = SM2OIDData
 	sd.digestOid = OIDDigestAlgorithmSM3
 	sd.isSM = true
 	return sd, nil
