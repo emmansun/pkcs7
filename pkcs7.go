@@ -77,14 +77,6 @@ var (
 	OIDEncryptionAlgorithmECDSAP256 = asn1.ObjectIdentifier{1, 2, 840, 10045, 3, 1, 7}
 	OIDEncryptionAlgorithmECDSAP384 = asn1.ObjectIdentifier{1, 3, 132, 0, 34}
 	OIDEncryptionAlgorithmECDSAP521 = asn1.ObjectIdentifier{1, 3, 132, 0, 35}
-
-	// Encryption Algorithms
-	OIDEncryptionAlgorithmDESCBC     = asn1.ObjectIdentifier{1, 3, 14, 3, 2, 7}
-	OIDEncryptionAlgorithmDESEDE3CBC = asn1.ObjectIdentifier{1, 2, 840, 113549, 3, 7}
-	OIDEncryptionAlgorithmAES256CBC  = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 42}
-	OIDEncryptionAlgorithmAES128GCM  = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 6}
-	OIDEncryptionAlgorithmAES128CBC  = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 2}
-	OIDEncryptionAlgorithmAES256GCM  = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 46}
 )
 
 var (
@@ -104,12 +96,6 @@ var (
 
 	// Encryption Algorithms SM2-3
 	OIDKeyEncryptionAlgorithmSM2 = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 301, 3}
-
-	// Encryption Algorithms
-	OIDEncryptionAlgorithmSM4GCM = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 104, 8}
-	OIDEncryptionAlgorithmSM4CBC = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 104, 2}
-	OIDEncryptionAlgorithmSM4ECB = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 104, 1}
-	OIDEncryptionAlgorithmSM4    = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 104}
 
 	//SM9 Signed Data OIDs
 	SM9OIDData                = asn1.ObjectIdentifier{1, 2, 156, 10197, 6, 1, 4, 4, 1}

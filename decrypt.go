@@ -3,16 +3,10 @@ package pkcs7
 import (
 	"bytes"
 	"crypto"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/des"
 	"crypto/rand"
 	"encoding/asn1"
 	"errors"
-	"fmt"
 
-	smcipher "github.com/emmansun/gmsm/cipher"
-	"github.com/emmansun/gmsm/sm4"
 	"github.com/emmansun/gmsm/smx509"
 )
 
@@ -85,107 +79,9 @@ func (eci encryptedContentInfo) getCiphertext() (ciphertext []byte) {
 
 func (eci encryptedContentInfo) decrypt(key []byte) ([]byte, error) {
 	alg := eci.ContentEncryptionAlgorithm.Algorithm
-	if !alg.Equal(OIDEncryptionAlgorithmDESCBC) &&
-		!alg.Equal(OIDEncryptionAlgorithmDESEDE3CBC) &&
-		!alg.Equal(OIDEncryptionAlgorithmAES256CBC) &&
-		!alg.Equal(OIDEncryptionAlgorithmAES128CBC) &&
-		!alg.Equal(OIDEncryptionAlgorithmSM4) &&
-		!alg.Equal(OIDEncryptionAlgorithmSM4ECB) &&
-		!alg.Equal(OIDEncryptionAlgorithmSM4CBC) &&
-		!alg.Equal(OIDEncryptionAlgorithmAES128GCM) &&
-		!alg.Equal(OIDEncryptionAlgorithmSM4GCM) &&
-		!alg.Equal(OIDEncryptionAlgorithmAES256GCM) {
+	cipher, ok := ciphers[alg.String()]
+	if !ok {
 		return nil, ErrUnsupportedAlgorithm
 	}
-
-	ciphertext := eci.getCiphertext()
-
-	var block cipher.Block
-	var err error
-
-	switch {
-	case alg.Equal(OIDEncryptionAlgorithmDESCBC):
-		block, err = des.NewCipher(key)
-	case alg.Equal(OIDEncryptionAlgorithmDESEDE3CBC):
-		block, err = des.NewTripleDESCipher(key)
-	case alg.Equal(OIDEncryptionAlgorithmSM4GCM), alg.Equal(OIDEncryptionAlgorithmSM4CBC), alg.Equal(OIDEncryptionAlgorithmSM4), alg.Equal(OIDEncryptionAlgorithmSM4ECB):
-		block, err = sm4.NewCipher(key)
-	case alg.Equal(OIDEncryptionAlgorithmAES256CBC), alg.Equal(OIDEncryptionAlgorithmAES256GCM):
-		fallthrough
-	case alg.Equal(OIDEncryptionAlgorithmAES128GCM), alg.Equal(OIDEncryptionAlgorithmAES128CBC):
-		block, err = aes.NewCipher(key)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	var iv []byte
-	if alg.Equal(OIDEncryptionAlgorithmSM4GCM) || alg.Equal(OIDEncryptionAlgorithmAES128GCM) || alg.Equal(OIDEncryptionAlgorithmAES256GCM) {
-		params := aesGCMParameters{}
-		paramBytes := eci.ContentEncryptionAlgorithm.Parameters.FullBytes
-
-		_, err := asn1.Unmarshal(paramBytes, &params)
-		if err != nil {
-			return nil, err
-		}
-
-		gcm, err := cipher.NewGCM(block)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(params.Nonce) != gcm.NonceSize() {
-			return nil, errors.New("pkcs7: encryption algorithm parameters are incorrect")
-		}
-		if params.ICVLen != gcm.Overhead() {
-			return nil, errors.New("pkcs7: encryption algorithm parameters are incorrect")
-		}
-
-		plaintext, err := gcm.Open(nil, params.Nonce, ciphertext, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		return plaintext, nil
-	} else if alg.Equal(OIDEncryptionAlgorithmSM4ECB) || alg.Equal(OIDEncryptionAlgorithmSM4) {
-		mode := smcipher.NewECBDecrypter(block)
-		plaintext := make([]byte, len(ciphertext))
-		mode.CryptBlocks(plaintext, ciphertext)
-		return plaintext, nil
-	}
-	iv = eci.ContentEncryptionAlgorithm.Parameters.Bytes
-	if len(iv) != block.BlockSize() {
-		return nil, errors.New("pkcs7: encryption algorithm parameters are malformed")
-	}
-
-	mode := cipher.NewCBCDecrypter(block, iv)
-	plaintext := make([]byte, len(ciphertext))
-	mode.CryptBlocks(plaintext, ciphertext)
-	if plaintext, err = unpad(plaintext, mode.BlockSize()); err != nil {
-		return nil, err
-	}
-	return plaintext, nil
-}
-
-func unpad(data []byte, blocklen int) ([]byte, error) {
-	if blocklen < 1 {
-		return nil, fmt.Errorf("invalid blocklen %d", blocklen)
-	}
-	if len(data)%blocklen != 0 || len(data) == 0 {
-		return nil, fmt.Errorf("invalid data len %d", len(data))
-	}
-
-	// the last byte is the length of padding
-	padlen := int(data[len(data)-1])
-
-	// check padding integrity, all bytes should be the same
-	pad := data[len(data)-padlen:]
-	for _, padbyte := range pad {
-		if padbyte != byte(padlen) {
-			return nil, errors.New("invalid padding")
-		}
-	}
-
-	return data[:len(data)-padlen], nil
+	return cipher.Decrypt(key, &eci.ContentEncryptionAlgorithm.Parameters, eci.getCiphertext())
 }

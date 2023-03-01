@@ -134,35 +134,40 @@ type SignedAndEnvelopedData struct {
 	isSM      bool
 }
 
-func NewSignedAndEnvelopedData(data []byte, alg EncryptionAlgorithm) (*SignedAndEnvelopedData, error) {
-	var eci *encryptedContentInfo
+func NewSignedAndEnvelopedData(data []byte, alg asn1.ObjectIdentifier) (*SignedAndEnvelopedData, error) {
 	var key []byte
 	var err error
 
 	// Apply chosen symmetric encryption method
-	switch alg {
-	case EncryptionAlgorithmDESCBC, EncryptionAlgorithmDESEDE3CBC, EncryptionAlgorithmSM4CBC, EncryptionAlgorithmAES128CBC, EncryptionAlgorithmAES256CBC:
-		key, eci, err = encryptCBC(alg, data, nil)
-	case EncryptionAlgorithmSM4GCM, EncryptionAlgorithmAES128GCM, EncryptionAlgorithmAES256GCM:
-		key, eci, err = encryptGCM(alg, data, nil)
-	case EncryptionAlgorithmSM4, EncryptionAlgorithmSM4ECB:
-		key, eci, err = encryptECB(alg, data, nil)
-	default:
+	cipher, ok := ciphers[alg.String()]
+	if !ok {
 		return nil, ErrUnsupportedEncryptionAlgorithm
 	}
 
+	// Create key
+	key = make([]byte, cipher.KeySize())
+	_, err = rand.Read(key)
 	if err != nil {
 		return nil, err
 	}
-	sed := signedEnvelopedData{
-		Version:              1,
-		EncryptedContentInfo: *eci,
+
+	id, ciphertext, err := cipher.Encrypt(key, data)
+	if err != nil {
+		return nil, err
 	}
 
+	sed := signedEnvelopedData{
+		Version: 1, // 0 or 1?
+		EncryptedContentInfo: encryptedContentInfo{
+			ContentType:                OIDData,
+			ContentEncryptionAlgorithm: *id,
+			EncryptedContent:           marshalEncryptedContent(ciphertext),
+		},
+	}
 	return &SignedAndEnvelopedData{sed: sed, data: data, cek: key, digestOid: OIDDigestAlgorithmSHA1, isSM: false}, nil
 }
 
-func NewSMSignedAndEnvelopedData(data []byte, alg EncryptionAlgorithm) (*SignedAndEnvelopedData, error) {
+func NewSMSignedAndEnvelopedData(data []byte, alg asn1.ObjectIdentifier) (*SignedAndEnvelopedData, error) {
 	sd, err := NewSignedAndEnvelopedData(data, alg)
 	if err != nil {
 		return nil, err

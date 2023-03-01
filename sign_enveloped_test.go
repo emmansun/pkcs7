@@ -2,7 +2,9 @@ package pkcs7
 
 import (
 	"bytes"
+	"encoding/asn1"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -167,7 +169,7 @@ func TestCreateSignedEvnvelopedData(t *testing.T) {
 	}
 	sm2Key.D.FillBytes(privKey)
 
-	testCipers := []EncryptionAlgorithm{EncryptionAlgorithmSM4, EncryptionAlgorithmSM4ECB, EncryptionAlgorithmSM4CBC, EncryptionAlgorithmSM4GCM}
+	testCipers := []asn1.ObjectIdentifier{OIDEncryptionAlgorithmSM4, OIDEncryptionAlgorithmSM4ECB, OIDEncryptionAlgorithmSM4CBC, OIDEncryptionAlgorithmSM4GCM}
 	for _, cipher := range testCipers {
 		saed, err := NewSMSignedAndEnvelopedData(privKey, cipher)
 		if err != nil {
@@ -186,7 +188,7 @@ func TestCreateSignedEvnvelopedData(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// fmt.Printf("%x\n", result)
+		fmt.Printf("%x\n", result)
 
 		// parse, decrypt, verify
 		p7Data, err := Parse(result)
