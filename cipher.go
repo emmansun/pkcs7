@@ -1,86 +1,185 @@
-package pkcs8
+package pkcs7
 
 import (
+	"crypto/aes"
 	"crypto/cipher"
+	"crypto/des"
 	"crypto/rand"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
 
+	smcipher "github.com/emmansun/gmsm/cipher"
 	"github.com/emmansun/gmsm/padding"
+	"github.com/emmansun/gmsm/sm4"
 )
 
-func genRandom(len int) ([]byte, error) {
-	value := make([]byte, len)
-	_, err := rand.Read(value)
-	return value, err
+var (
+	// Encryption Algorithms
+	OIDEncryptionAlgorithmDESCBC = asn1.ObjectIdentifier{1, 3, 14, 3, 2, 7}
+
+	OIDEncryptionAlgorithmDESEDE3CBC = asn1.ObjectIdentifier{1, 2, 840, 113549, 3, 7}
+
+	OIDEncryptionAlgorithmAES128CBC = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 2}
+	OIDEncryptionAlgorithmAES192CBC = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 22}
+	OIDEncryptionAlgorithmAES256CBC = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 42}
+
+	OIDEncryptionAlgorithmAES128GCM = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 6}
+	OIDEncryptionAlgorithmAES192GCM = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 26}
+	OIDEncryptionAlgorithmAES256GCM = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 46}
+
+	OIDEncryptionAlgorithmSM4GCM = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 104, 8}
+	OIDEncryptionAlgorithmSM4CBC = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 104, 2}
+	OIDEncryptionAlgorithmSM4ECB = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 104, 1}
+	OIDEncryptionAlgorithmSM4    = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 104}
+)
+
+// Cipher represents a cipher for encrypting the key material.
+type Cipher interface {
+	// KeySize returns the key size of the cipher, in bytes.
+	KeySize() int
+	// Encrypt encrypts the key material.
+	Encrypt(key, plaintext []byte) (*pkix.AlgorithmIdentifier, []byte, error)
+	// Decrypt decrypts the key material.
+	Decrypt(key []byte, parameters *asn1.RawValue, ciphertext []byte) ([]byte, error)
+	// OID returns the OID of the cipher specified.
+	OID() asn1.ObjectIdentifier
 }
 
-type cipherWithBlock struct {
+var ciphers = map[string]Cipher{
+	OIDEncryptionAlgorithmSM4.String(): &ecbBlockCipher{baseBlockCipher{
+		keySize:  16,
+		newBlock: sm4.NewCipher,
+		oid:      OIDEncryptionAlgorithmSM4}},
+	OIDEncryptionAlgorithmSM4ECB.String(): &ecbBlockCipher{baseBlockCipher{
+		keySize:  16,
+		newBlock: sm4.NewCipher,
+		oid:      OIDEncryptionAlgorithmSM4ECB}},
+	OIDEncryptionAlgorithmDESCBC.String(): &cbcBlockCipher{baseBlockCipher: baseBlockCipher{
+		keySize:  8,
+		newBlock: des.NewCipher,
+		oid:      OIDEncryptionAlgorithmDESCBC}, ivSize: des.BlockSize},
+	OIDEncryptionAlgorithmDESEDE3CBC.String(): &cbcBlockCipher{baseBlockCipher: baseBlockCipher{
+		keySize:  24,
+		newBlock: des.NewTripleDESCipher,
+		oid:      OIDEncryptionAlgorithmDESEDE3CBC}, ivSize: des.BlockSize},
+	OIDEncryptionAlgorithmAES128CBC.String(): &cbcBlockCipher{baseBlockCipher: baseBlockCipher{
+		keySize:  16,
+		newBlock: aes.NewCipher,
+		oid:      OIDEncryptionAlgorithmAES128CBC}, ivSize: aes.BlockSize},
+	OIDEncryptionAlgorithmAES192CBC.String(): &cbcBlockCipher{baseBlockCipher: baseBlockCipher{
+		keySize:  24,
+		newBlock: aes.NewCipher,
+		oid:      OIDEncryptionAlgorithmAES192CBC}, ivSize: aes.BlockSize},
+	OIDEncryptionAlgorithmAES256CBC.String(): &cbcBlockCipher{baseBlockCipher: baseBlockCipher{
+		keySize:  32,
+		newBlock: aes.NewCipher,
+		oid:      OIDEncryptionAlgorithmAES256CBC}, ivSize: aes.BlockSize},
+	OIDEncryptionAlgorithmSM4CBC.String(): &cbcBlockCipher{baseBlockCipher: baseBlockCipher{
+		keySize:  16,
+		newBlock: sm4.NewCipher,
+		oid:      OIDEncryptionAlgorithmSM4CBC}, ivSize: sm4.BlockSize},
+	OIDEncryptionAlgorithmAES128GCM.String(): &gcmBlockCipher{baseBlockCipher: baseBlockCipher{
+		keySize:  16,
+		newBlock: aes.NewCipher,
+		oid:      OIDEncryptionAlgorithmAES128GCM}, nonceSize: 12},
+	OIDEncryptionAlgorithmAES192GCM.String(): &gcmBlockCipher{baseBlockCipher: baseBlockCipher{
+		keySize:  24,
+		newBlock: aes.NewCipher,
+		oid:      OIDEncryptionAlgorithmAES192GCM}, nonceSize: 12},
+	OIDEncryptionAlgorithmAES256GCM.String(): &gcmBlockCipher{baseBlockCipher: baseBlockCipher{
+		keySize:  32,
+		newBlock: aes.NewCipher,
+		oid:      OIDEncryptionAlgorithmAES256GCM}, nonceSize: 12},
+	OIDEncryptionAlgorithmSM4GCM.String(): &gcmBlockCipher{baseBlockCipher: baseBlockCipher{
+		keySize:  16,
+		newBlock: sm4.NewCipher,
+		oid:      OIDEncryptionAlgorithmSM4GCM}, nonceSize: 12},
+}
+
+type baseBlockCipher struct {
 	oid      asn1.ObjectIdentifier
-	ivSize   int
 	keySize  int
 	newBlock func(key []byte) (cipher.Block, error)
 }
 
-func (c cipherWithBlock) KeySize() int {
-	return c.keySize
+func (b *baseBlockCipher) KeySize() int {
+	return b.keySize
 }
 
-func (c cipherWithBlock) OID() asn1.ObjectIdentifier {
-	return c.oid
+func (b *baseBlockCipher) OID() asn1.ObjectIdentifier {
+	return b.oid
 }
 
-func (c cipherWithBlock) Encrypt(key, plaintext []byte) (*pkix.AlgorithmIdentifier, []byte, error) {
-	block, err := c.newBlock(key)
+type ecbBlockCipher struct {
+	baseBlockCipher
+}
+
+func (ecb *ecbBlockCipher) Encrypt(key, plaintext []byte) (*pkix.AlgorithmIdentifier, []byte, error) {
+	block, err := ecb.newBlock(key)
 	if err != nil {
 		return nil, nil, err
 	}
-	iv, err := genRandom(c.ivSize)
-	if err != nil {
-		return nil, nil, err
-	}
-	ciphertext, err := cbcEncrypt(block, key, iv, plaintext)
-	if err != nil {
-		return nil, nil, err
-	}
-	marshalledIV, err := asn1.Marshal(iv)
-	if err != nil {
-		return nil, nil, err
-	}
+	mode := smcipher.NewECBEncrypter(block)
+	ciphertext := make([]byte, len(plaintext))
+	mode.CryptBlocks(ciphertext, plaintext)
 
 	encryptionScheme := pkix.AlgorithmIdentifier{
-		Algorithm:  c.oid,
-		Parameters: asn1.RawValue{FullBytes: marshalledIV},
+		Algorithm: ecb.oid,
 	}
 
 	return &encryptionScheme, ciphertext, nil
 }
 
-func (c cipherWithBlock) Decrypt(key []byte, parameters *asn1.RawValue, encryptedKey []byte) ([]byte, error) {
-	block, err := c.newBlock(key)
+func (ecb *ecbBlockCipher) Decrypt(key []byte, parameters *asn1.RawValue, ciphertext []byte) ([]byte, error) {
+	block, err := ecb.newBlock(key)
+	if err != nil {
+		return nil, err
+	}
+	mode := smcipher.NewECBDecrypter(block)
+	plaintext := make([]byte, len(ciphertext))
+	mode.CryptBlocks(plaintext, ciphertext)
+	return plaintext, nil
+}
+
+type cbcBlockCipher struct {
+	baseBlockCipher
+	ivSize int
+}
+
+func (cbc *cbcBlockCipher) Encrypt(key, plaintext []byte) (*pkix.AlgorithmIdentifier, []byte, error) {
+	block, err := cbc.newBlock(key)
+	if err != nil {
+		return nil, nil, err
+	}
+	iv := make([]byte, block.BlockSize())
+	_, err = rand.Read(iv)
+	if err != nil {
+		return nil, nil, err
+	}
+	mode := cipher.NewCBCEncrypter(block, iv)
+	pkcs7 := padding.NewPKCS7Padding(uint(block.BlockSize()))
+	plainText := pkcs7.Pad(plaintext)
+	ciphertext := make([]byte, len(plainText))
+	mode.CryptBlocks(ciphertext, plainText)
+
+	encryptionScheme := pkix.AlgorithmIdentifier{
+		Algorithm:  cbc.oid,
+		Parameters: asn1.RawValue{Tag: 4, Bytes: iv},
+	}
+	return &encryptionScheme, ciphertext, nil
+}
+
+func (cbc *cbcBlockCipher) Decrypt(key []byte, parameters *asn1.RawValue, ciphertext []byte) ([]byte, error) {
+	block, err := cbc.newBlock(key)
 	if err != nil {
 		return nil, err
 	}
 
 	var iv []byte
 	if _, err := asn1.Unmarshal(parameters.FullBytes, &iv); err != nil {
-		return nil, errors.New("pkcs8: invalid cipher parameters")
+		return nil, errors.New("pkcs7: invalid cipher parameters")
 	}
-
-	return cbcDecrypt(block, key, iv, encryptedKey)
-}
-
-func cbcEncrypt(block cipher.Block, key, iv, plaintext []byte) ([]byte, error) {
-	mode := cipher.NewCBCEncrypter(block, iv)
-	pkcs7 := padding.NewPKCS7Padding(uint(block.BlockSize()))
-	plainText := pkcs7.Pad(plaintext)
-	ciphertext := make([]byte, len(plainText))
-	mode.CryptBlocks(ciphertext, plainText)
-	return ciphertext, nil
-}
-
-func cbcDecrypt(block cipher.Block, key, iv, ciphertext []byte) ([]byte, error) {
 	mode := cipher.NewCBCDecrypter(block, iv)
 	pkcs7 := padding.NewPKCS7Padding(uint(block.BlockSize()))
 	plaintext := make([]byte, len(ciphertext))
@@ -88,38 +187,27 @@ func cbcDecrypt(block cipher.Block, key, iv, ciphertext []byte) ([]byte, error) 
 	return pkcs7.Unpad(plaintext)
 }
 
-type cipherWithGCM struct {
-	oid       asn1.ObjectIdentifier
+type gcmBlockCipher struct {
+	baseBlockCipher
 	nonceSize int
-	keySize   int
-	newBlock  func(key []byte) (cipher.Block, error)
 }
 
-// http://javadoc.iaik.tugraz.at/iaik_jce/current/index.html?iaik/security/cipher/GCMParameters.html
 type gcmParameters struct {
 	Nonce  []byte `asn1:"tag:4"`
 	ICVLen int
 }
 
-func (c cipherWithGCM) KeySize() int {
-	return c.keySize
-}
-
-func (c cipherWithGCM) OID() asn1.ObjectIdentifier {
-	return c.oid
-}
-
-func (c cipherWithGCM) Encrypt(key, plaintext []byte) (*pkix.AlgorithmIdentifier, []byte, error) {
-	block, err := c.newBlock(key)
+func (gcm *gcmBlockCipher) Encrypt(key, plaintext []byte) (*pkix.AlgorithmIdentifier, []byte, error) {
+	block, err := gcm.newBlock(key)
 	if err != nil {
 		return nil, nil, err
 	}
-	nonce, err := genRandom(c.nonceSize)
+	nonce := make([]byte, gcm.nonceSize)
+	_, err = rand.Read(nonce)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	aead, err := cipher.NewGCMWithNonceSize(block, c.nonceSize)
+	aead, err := cipher.NewGCMWithNonceSize(block, gcm.nonceSize)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -133,7 +221,7 @@ func (c cipherWithGCM) Encrypt(key, plaintext []byte) (*pkix.AlgorithmIdentifier
 		return nil, nil, err
 	}
 	encryptionAlgorithm := pkix.AlgorithmIdentifier{
-		Algorithm: c.oid,
+		Algorithm: gcm.oid,
 		Parameters: asn1.RawValue{
 			FullBytes: paramBytes,
 		},
@@ -141,8 +229,8 @@ func (c cipherWithGCM) Encrypt(key, plaintext []byte) (*pkix.AlgorithmIdentifier
 	return &encryptionAlgorithm, ciphertext, nil
 }
 
-func (c cipherWithGCM) Decrypt(key []byte, parameters *asn1.RawValue, encryptedKey []byte) ([]byte, error) {
-	block, err := c.newBlock(key)
+func (gcm *gcmBlockCipher) Decrypt(key []byte, parameters *asn1.RawValue, ciphertext []byte) ([]byte, error) {
+	block, err := gcm.newBlock(key)
 	if err != nil {
 		return nil, err
 	}
@@ -156,8 +244,8 @@ func (c cipherWithGCM) Decrypt(key []byte, parameters *asn1.RawValue, encryptedK
 		return nil, err
 	}
 	if params.ICVLen != aead.Overhead() {
-		return nil, errors.New("pkcs8: invalid tag size")
+		return nil, errors.New("pkcs7: invalid tag size")
 	}
 
-	return aead.Open(nil, params.Nonce, encryptedKey, nil)
+	return aead.Open(nil, params.Nonce, ciphertext, nil)
 }
