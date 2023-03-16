@@ -1,5 +1,11 @@
 # pkcs7
 
+⚠️⚠️⚠️
+
+**Status:** Archived and not maintained, merged it to gmsm.
+
+⚠️⚠️⚠️
+
 [![GoDoc](https://godoc.org/github.com/emmansun/pkcs7?status.svg)](https://godoc.org/github.com/emmansun/pkcs7)
 [![ci](https://github.com/emmansun/pkcs7/actions/workflows/ci.yml/badge.svg)](https://github.com/emmansun/pkcs7/actions/workflows/ci.yml)
 
